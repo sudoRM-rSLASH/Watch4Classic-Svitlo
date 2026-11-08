@@ -1,0 +1,12 @@
+# Gradle / build
+/.gradle/
+/build/
+/app/build/
+/.kotlin/
+
+# Local machine
+local.properties
+/.idea/
+*.iml
+.DS_Store
+/.claude/
