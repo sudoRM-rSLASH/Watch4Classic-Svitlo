@@ -42,6 +42,8 @@ class MainActivity : Activity() {
     private lateinit var maybeRow: TextView
     private lateinit var maybeSwitch: Switch
     private lateinit var maybeCard: LinearLayout
+    private lateinit var notifyOffRow: TextView
+    private lateinit var notifyOnRow: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var busy = false
 
@@ -70,6 +72,8 @@ class MainActivity : Activity() {
         btn = pill("Оновити", Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
         sourceRow = settingRow { pickSource() }
         queueRow = settingRow { pickQueue() }
+        notifyOffRow = settingRow { onLeadRow(off = true) }
+        notifyOnRow = settingRow { onLeadRow(off = false) }
         maybeRow = label(13f, Palette.GREY)
         maybeSwitch = Switch(this).apply {
             isClickable = false // the whole row handles the click
@@ -117,6 +121,14 @@ class MainActivity : Activity() {
                 bottomMargin = dp(6f).toInt()
             })
             addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(label(13f, Palette.WHITE, bold = true).apply {
+                text = "Сповіщення"
+                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
+            })
+            addView(notifyOffRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(notifyOnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         scroll = ScrollView(this).apply {
             isFocusable = true
@@ -166,6 +178,58 @@ class MainActivity : Activity() {
                 applySettings { Settings.set(this, source = all[i]) }
             }
             .show()
+    }
+
+    /** Notifications on but blocked by the system: ask for permission first, otherwise pick the time. */
+    private fun onLeadRow(off: Boolean) {
+        val lead = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        if (lead > 0 && !Notify.enabled(this)) askNotificationPermission() else pickLead(off)
+    }
+
+    /** Pick the notification lead time; the list scrolls with the bezel. */
+    private fun pickLead(off: Boolean) {
+        val all = Notify.LEADS
+        val cur = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        AlertDialog.Builder(this)
+            .setTitle(if (off) "Перед вимкненням" else "Перед увімкненням")
+            .setSingleChoiceItems(all.map { Notify.leadLabel(it) }.toTypedArray(), all.indexOf(cur).coerceAtLeast(0)) { d, i ->
+                d.dismiss()
+                if (off) Settings.setNotify(this, off = all[i]) else Settings.setNotify(this, on = all[i])
+                if (all[i] > 0) askNotificationPermission()
+                Notify.schedule(this)
+                render()
+            }
+            .show()
+    }
+
+    /**
+     * Permission not asked yet, or may be asked again: show the system dialog.
+     * If denied permanently or turned off in settings: open the app's notification settings.
+     */
+    private fun askNotificationPermission() {
+        if (Notify.enabled(this)) return
+        val perm = android.Manifest.permission.POST_NOTIFICATIONS
+        val granted = android.os.Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val prefs = getSharedPreferences("notify", MODE_PRIVATE)
+        val askedBefore = prefs.getBoolean("asked", false)
+        if (!granted && (!askedBefore || shouldShowRequestPermissionRationale(perm))) {
+            prefs.edit().putBoolean("asked", true).apply()
+            requestPermissions(arrayOf(perm), 1)
+        } else {
+            runCatching {
+                startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Notify.schedule(this)
+        render()
     }
 
     private fun pickQueue() {
@@ -232,6 +296,15 @@ class MainActivity : Activity() {
         val src = Settings.source(this)
         sourceRow.text = "Джерело\n${src.host}"
         queueRow.text = "Черга\n${Settings.queue(this)}"
+        val blocked = !Notify.enabled(this)
+        for ((row, title, lead) in listOf(
+            Triple(notifyOffRow, "Перед вимкненням", Settings.notifyOff(this)),
+            Triple(notifyOnRow, "Перед увімкненням", Settings.notifyOn(this)),
+        )) {
+            val warn = blocked && lead > 0
+            row.text = "$title\n${Notify.leadLabel(lead)}" + if (warn) "\n⚠ сповіщення заборонені" else ""
+            row.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
+        }
         val maybeOff = Settings.maybeIsOff(this)
         maybeRow.text = (if (maybeOff) "Жовте = OFF" else "Жовте = ON") + "\nу відліку"
         maybeSwitch.isChecked = maybeOff

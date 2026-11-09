@@ -94,6 +94,13 @@ object Settings {
 
     fun setMaybeIsOff(c: Context, v: Boolean) { p(c).edit().putBoolean("maybeOff", v).apply() }
 
+    /** How many minutes before power goes off / on to notify (0 = don't notify). */
+    fun notifyOff(c: Context): Int = p(c).getInt("notifyOff", 0)
+    fun notifyOn(c: Context): Int = p(c).getInt("notifyOn", 0)
+    fun setNotify(c: Context, off: Int = notifyOff(c), on: Int = notifyOn(c)) {
+        p(c).edit().putInt("notifyOff", off).putInt("notifyOn", on).apply()
+    }
+
     /** Changing the source/queue clears the cache: the old schedule no longer applies. */
     fun set(c: Context, source: Source = source(c), queue: String = queue(c)) {
         if (source == source(c) && queue == queue(c)) return
@@ -181,12 +188,14 @@ object Fetcher {
         val before = Store.snapshot(c)
         val ok = refresh(c)
         if (Store.snapshot(c) != before) notifyAll(c)
+        Notify.schedule(c)
         return ok
     }
 
     fun notifyAll(c: Context) {
         TileService.getUpdater(c).requestUpdate(LightTileService::class.java)
         LightComplicationService.requestUpdate(c)
+        Notify.schedule(c)
     }
 }
 
