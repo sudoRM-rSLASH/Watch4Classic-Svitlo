@@ -39,4 +39,5 @@ dependencies {
     implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.guava:guava:33.3.1-android")
+    testImplementation("junit:junit:4.13.2")
 }
