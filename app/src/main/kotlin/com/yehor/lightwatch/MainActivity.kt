@@ -24,11 +24,11 @@ import java.time.format.DateTimeFormatter
 import kotlin.concurrent.thread
 
 /**
- * Екран застосунку (прокрутка, у т.ч. безелем):
- *  1) статус і відлік,
- *  2) відключення на сьогодні / завтра,
- *  3) час оновлення, кнопка "Оновити",
- *  4) налаштування: джерело і черга.
+ * App screen (scrollable, including with the bezel):
+ *  1) status and countdown,
+ *  2) outages for today / tomorrow,
+ *  3) last update time, "Оновити" (refresh) button,
+ *  4) settings: source, queue, yellow slots, notifications.
  */
 class MainActivity : Activity() {
     private lateinit var head: LinearLayout
@@ -92,7 +92,7 @@ class MainActivity : Activity() {
             addView(col)
         }
         setContentView(scroll)
-        scroll.requestFocus() // обертання безеля прокручує екран
+        scroll.requestFocus() // rotating the bezel scrolls the screen
 
         if (System.currentTimeMillis() - Store.fetchedAt(this) > 2 * 60_000L) refreshNow()
     }
@@ -107,7 +107,7 @@ class MainActivity : Activity() {
         ui.removeCallbacks(tick)
     }
 
-    // ---------------------------------------------------------------- дії
+    // ---------------------------------------------------------------- actions
 
     private fun refreshNow() {
         if (busy) return
@@ -157,7 +157,7 @@ class MainActivity : Activity() {
         refreshNow()
     }
 
-    // ---------------------------------------------------------------- рендер
+    // ---------------------------------------------------------------- rendering
 
     private fun render() {
         val days = Store.load(this)
@@ -287,7 +287,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---------------------------------------------------------------- віджети
+    // ---------------------------------------------------------------- widgets
 
     private fun settingRow(onClick: () -> Unit) = label(13f, Palette.GREY).apply {
         setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(14f).toInt(), dp(8f).toInt())
@@ -325,7 +325,7 @@ class MainActivity : Activity() {
     }
 }
 
-/** Горизонтальна смужка доби (48 слотів по 30 хв). */
+/** Horizontal strip of the day (48 slots of 30 min). */
 private class StripView(c: Context, val flags: BooleanArray, val maybe: BooleanArray?, val curSlot: Int) : View(c) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(cv: Canvas) {

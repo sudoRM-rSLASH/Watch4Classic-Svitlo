@@ -30,8 +30,8 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /**
- * Тайл: черга, статус і відлік у центрі, смужка найближчих 12 годин.
- * Таймлайн: макет на кожні пів години (~3 год наперед); відлік — динамічний текст, годинник рахує сам.
+ * Tile: queue, status and countdown in the centre, a strip of the next 12 hours.
+ * Timeline: a layout per half hour (~3 h ahead); the countdown is dynamic text computed by the watch.
  */
 class LightTileService : TileService() {
     private var queue = ""
@@ -46,7 +46,7 @@ class LightTileService : TileService() {
         val fetched = Store.fetchedAt(this)
         queue = Settings.queue(this)
         val start = ZonedDateTime.now(Schedule.ZONE).truncatedTo(ChronoUnit.MINUTES)
-        // Межі півгодинних слотів: у межах слота змінюється лише відлік, а його рахує сам годинник.
+        // Half-hour slot boundaries: within a slot only the countdown changes, and the watch computes it.
         val firstBoundary = start.truncatedTo(ChronoUnit.HOURS).plusMinutes(if (start.minute >= 30) 60 else 30)
         val bounds = listOf(start) + List(TIMELINE_SLOTS) { firstBoundary.plusMinutes(30L * it) }
 
@@ -119,7 +119,7 @@ class LightTileService : TileService() {
             .build()
     }
 
-    /** Смужка найближчих 12 годин (24 слоти по 30 хв). */
+    /** Strip of the next 12 hours (24 slots of 30 min). */
     private fun strip(days: Map<LocalDate, BooleanArray>, now: ZonedDateTime): LayoutElement {
         val row = Row.Builder().setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
         val m = Schedule.upcoming(maybe, now, STRIP_SLOTS)
@@ -223,8 +223,8 @@ class LightTileService : TileService() {
     }
 
     /**
-     * Великий відлік "2г 17хв" / "5г" / "34хв" як динамічний текст (хвилини вгору, +59 с).
-     * Старий рендерер без підтримки покаже статичне значення на початок макета.
+     * Large "2г 17хв" / "5г" / "34хв" countdown as dynamic text (minutes rounded up, +59 s).
+     * Older renderers without support show the static value as of the layout start.
      */
     private fun countdown(st: Schedule.Status, now: ZonedDateTime): LayoutElement {
         val pre = if (st.changeIsMinimum) "≥ " else ""
@@ -283,7 +283,7 @@ class LightTileService : TileService() {
     private companion object {
         const val RES_VERSION = "3"
         const val STRIP_SLOTS = 24
-        /** Півгодинних макетів наперед (~3 год); тайл однаково перезапитується кожні 15 хв. */
+        /** Half-hour layouts ahead (~3 h); the tile is re-requested every 15 min anyway. */
         const val TIMELINE_SLOTS = 6
         val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 

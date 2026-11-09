@@ -17,11 +17,11 @@ android {
 
     buildTypes {
         release {
-            // R8: вирізає невикористаний код бібліотек — APK у рази менший, менше RAM на годиннику
+            // R8 strips unused library code: a much smaller APK and less RAM on the watch
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // особистий застосунок: підписуємо debug-ключем, щоб ставився поверх debug-версії
+            // personal app: sign with the debug key so it installs over the debug build
             signingConfig = signingConfigs.getByName("debug")
         }
     }

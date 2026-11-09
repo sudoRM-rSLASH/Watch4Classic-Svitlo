@@ -31,11 +31,11 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
- * Complication для циферблата.
- *  SHORT_TEXT  : іконка (⚡ / ⚡ перекреслена) + відлік + "→вимк"/"→увімк"
- *  LONG_TEXT   : "Світло є · вимк о 14:00" + відлік
- *  RANGED_VALUE: дуга — скільки пройшло від поточної фази, у центрі відлік
- * Відлік рахує сам циферблат; таймлайн перемикає стан рівно в момент зміни.
+ * Watch face complication.
+ *  SHORT_TEXT  : icon (⚡ / struck-through ⚡) + countdown + "→вимк"/"→увімк"
+ *  LONG_TEXT   : "Світло є · вимк о 14:00" + countdown
+ *  RANGED_VALUE: arc = elapsed part of the current phase, countdown in the centre
+ * The watch face runs the countdown itself; the timeline switches state exactly at the change.
  */
 class LightComplicationService : SuspendingTimelineComplicationDataSourceService() {
 
@@ -63,11 +63,11 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
     }
 
     /**
-     * SHORT_TEXT / RANGED_VALUE (маленьке коло):
-     *   заголовок — поточний стан "ON"/"OFF" (влазить ~5 символів), текст — скільки ще "5:54" / "0:37"
-     *   (динамічний текст: годинник сам перераховує щохвилини; без підтримки — статичний "5:54" на момент запиту),
-     *   іконка — блискавка (перекреслена, коли світла немає), дуга — пройдена частина фази.
-     * LONG_TEXT: заголовок — "OFF · ще 5:54", текст — "Світло з 01:00" / "Вимкнуть о 14:00".
+     * SHORT_TEXT / RANGED_VALUE (small circle):
+     *   title: current state "ON"/"OFF" (~5 chars fit), text: time left "5:54" / "0:37"
+     *   (dynamic text: the watch recomputes it every minute; without support, a static "5:54" as of the request),
+     *   icon: a bolt (struck through when the power is off), arc: elapsed part of the phase.
+     * LONG_TEXT: title "OFF · ще 5:54", text "Світло з 01:00" / "Вимкнуть о 14:00".
      */
     private fun build(type: ComplicationType, st: Schedule.Status?, now: ZonedDateTime): ComplicationData? {
         if (st == null) return noData(type)
@@ -84,7 +84,7 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
         )
         val img = icon(st.off)
 
-        // маленький формат
+        // small format
         val shortTitle: ComplicationText = text(stateEn)
         val shortText: ComplicationText =
             countdown()
@@ -122,8 +122,8 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
     }
 
     /**
-     * Відлік "H:MM" до [target]. Хвилини округлюємо вгору (+59 с), як годинник робить для таймерів:
-     * за 30 с до зміни покаже "0:01", а не "0:00".
+     * "H:MM" countdown to [target]. Minutes are rounded up (+59 s), as the watch does for timers:
+     * 30 s before the change it shows "0:01", not "0:00".
      */
     private fun hmCountdown(target: ZonedDateTime, now: ZonedDateTime, prefix: String): ComplicationText {
         val dur = DynamicInstant.platformTimeWithSecondsPrecision()
@@ -169,7 +169,7 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
         ).build()
 
     companion object {
-        /** Викликається після оновлення кешу, щоб циферблат одразу підхопив нові дані. */
+        /** Called after the cache is updated so the watch face picks up new data right away. */
         fun requestUpdate(c: Context) {
             ComplicationDataSourceUpdateRequester
                 .create(c, ComponentName(c, LightComplicationService::class.java))
