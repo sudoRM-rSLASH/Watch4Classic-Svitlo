@@ -36,11 +36,13 @@ import java.time.temporal.ChronoUnit
 class LightTileService : TileService() {
     private var queue = ""
     private var maybe: Map<LocalDate, BooleanArray> = emptyMap()
+    private var stale = false
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         Refresh.ifStale(this)
 
         val days = Store.load(this, Settings.maybeIsOff(this))
+        stale = Store.isStale(this)
         maybe = Store.loadMaybe(this)
         val err = Store.error(this)
         val fetched = Store.fetchedAt(this)
@@ -210,7 +212,7 @@ class LightTileService : TileService() {
             val t = java.time.Instant.ofEpochMilli(fetched).atZone(Schedule.ZONE)
             col.addContent(gap(6f))
                 .addContent(
-                    if (err != null) text("⚠ дані від ${hhmm(t)}", 12f, AMBER)
+                    if (err != null || stale) text("⚠ дані від ${if (t.toLocalDate() == now.toLocalDate()) hhmm(t) else t.format(DDHHMM)}", 12f, AMBER)
                     else text("оновлено ${hhmm(t)}", 12f, LABEL)
                 )
         }
@@ -285,6 +287,7 @@ class LightTileService : TileService() {
         const val STRIP_SLOTS = 24
         /** Half-hour layouts ahead (~3 h); the tile is re-requested every 15 min anyway. */
         const val TIMELINE_SLOTS = 6
+        val DDHHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
         val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
         const val GREEN = Palette.GREEN

@@ -224,8 +224,10 @@ class MainActivity : Activity() {
         } else if (!busy) sb.append("Ще не оновлювалось")
         val err = Store.error(this)
         err?.let { sb.append("\n⚠ ").append(it) }
+        val stale = Store.isStale(this)
+        if (stale && err == null) sb.insert(0, "⚠ ")
         footer.text = sb
-        footer.setTextColor(if (err != null) Palette.AMBER else Palette.LABEL)
+        footer.setTextColor(if (err != null || stale) Palette.AMBER else Palette.LABEL)
 
         val src = Settings.source(this)
         sourceRow.text = "Джерело\n${src.host}"

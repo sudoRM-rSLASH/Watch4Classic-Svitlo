@@ -140,6 +140,12 @@ object Store {
     fun clear(c: Context) { p(c).edit().clear().apply() }
 
     fun fetchedAt(c: Context): Long = p(c).getLong("fetched", 0L)
+    /** Data older than [STALE_WARN_MS]: show a warning, the schedule may have changed. */
+    fun isStale(c: Context, now: Long = System.currentTimeMillis()): Boolean =
+        fetchedAt(c).let { it > 0 && now - it > STALE_WARN_MS }
+
+    const val STALE_WARN_MS = 3 * 60 * 60_000L
+
     fun error(c: Context): String? = p(c).getString("error", null)
     fun setError(c: Context, msg: String) { p(c).edit().putString("error", msg).apply() }
 }
