@@ -40,7 +40,7 @@ class LightTileService : TileService() {
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         Refresh.ifStale(this)
 
-        val days = Store.load(this)
+        val days = Store.load(this, Settings.maybeIsOff(this))
         maybe = Store.loadMaybe(this)
         val err = Store.error(this)
         val fetched = Store.fetchedAt(this)

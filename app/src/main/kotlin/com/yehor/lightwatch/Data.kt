@@ -89,6 +89,11 @@ object Settings {
 
     fun queue(c: Context): String = p(c).getString("queue", null)?.takeIf { it in QUEUES } ?: "3.2"
 
+    /** Whether "switching" (yellow) slots count as no power in the countdown (tile and complication). Defaults to true. */
+    fun maybeIsOff(c: Context): Boolean = p(c).getBoolean("maybeOff", true)
+
+    fun setMaybeIsOff(c: Context, v: Boolean) { p(c).edit().putBoolean("maybeOff", v).apply() }
+
     /** Changing the source/queue clears the cache: the old schedule no longer applies. */
     fun set(c: Context, source: Source = source(c), queue: String = queue(c)) {
         if (source == source(c) && queue == queue(c)) return
@@ -122,8 +127,8 @@ object Store {
     }
 
     /** true: no power (including "may be off" while switching). */
-    fun load(c: Context): Map<LocalDate, BooleanArray> =
-        raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] != 0 } }
+    fun load(c: Context, maybeIsOff: Boolean = true): Map<LocalDate, BooleanArray> =
+        raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] == 1 || (maybeIsOff && a[it] == 2) } }
 
     /** true: switching slot, power may be off. */
     fun loadMaybe(c: Context): Map<LocalDate, BooleanArray> =

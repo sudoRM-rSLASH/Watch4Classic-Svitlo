@@ -17,6 +17,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -37,6 +38,9 @@ class MainActivity : Activity() {
     private lateinit var btn: TextView
     private lateinit var sourceRow: TextView
     private lateinit var queueRow: TextView
+    private lateinit var maybeRow: TextView
+    private lateinit var maybeSwitch: Switch
+    private lateinit var maybeCard: LinearLayout
     private val ui = Handler(Looper.getMainLooper())
     private var busy = false
 
@@ -65,6 +69,30 @@ class MainActivity : Activity() {
         btn = pill("Оновити", Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
         sourceRow = settingRow { pickSource() }
         queueRow = settingRow { pickQueue() }
+        maybeRow = label(13f, Palette.GREY)
+        maybeSwitch = Switch(this).apply {
+            isClickable = false // the whole row handles the click
+            isFocusable = false
+            val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
+            thumbTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER, Palette.GREY))
+            trackTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER_DIM, Palette.LABEL))
+        }
+        maybeCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(8f).toInt(), dp(8f).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18f)
+                setColor(Palette.CARD)
+            }
+            addView(maybeRow, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(maybeSwitch)
+            setOnClickListener {
+                Settings.setMaybeIsOff(this@MainActivity, !Settings.maybeIsOff(this@MainActivity))
+                Fetcher.notifyAll(this@MainActivity)
+                render()
+            }
+        }
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -84,7 +112,10 @@ class MainActivity : Activity() {
             addView(sourceRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
                 bottomMargin = dp(6f).toInt()
             })
-            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         val scroll = ScrollView(this).apply {
             isFocusable = true
@@ -160,7 +191,7 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- rendering
 
     private fun render() {
-        val days = Store.load(this)
+        val days = Store.load(this, Settings.maybeIsOff(this))
         val maybe = Store.loadMaybe(this)
         val now = ZonedDateTime.now(Schedule.ZONE)
         renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
@@ -190,6 +221,9 @@ class MainActivity : Activity() {
         val src = Settings.source(this)
         sourceRow.text = "Джерело\n${src.host}"
         queueRow.text = "Черга\n${Settings.queue(this)}"
+        val maybeOff = Settings.maybeIsOff(this)
+        maybeRow.text = (if (maybeOff) "Жовте = OFF" else "Жовте = ON") + "\nу відліку"
+        maybeSwitch.isChecked = maybeOff
     }
 
     private fun renderHead(st: Schedule.Status?, now: ZonedDateTime, switching: Boolean) {

@@ -49,7 +49,7 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationDataTimeline? {
         Refresh.ifStale(this)
         val type = request.complicationType
-        val days = Store.load(this)
+        val days = Store.load(this, Settings.maybeIsOff(this))
         val now = ZonedDateTime.now(Schedule.ZONE)
         val default = build(type, Schedule.status(days, now), now) ?: return null
 
