@@ -17,6 +17,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -24,19 +25,25 @@ import java.time.format.DateTimeFormatter
 import kotlin.concurrent.thread
 
 /**
- * Екран застосунку (прокрутка, у т.ч. безелем):
- *  1) статус і відлік,
- *  2) відключення на сьогодні / завтра,
- *  3) час оновлення, кнопка "Оновити",
- *  4) налаштування: джерело і черга.
+ * App screen (scrollable, including with the bezel):
+ *  1) status and countdown,
+ *  2) outages for today / tomorrow,
+ *  3) last update time, "Оновити" (refresh) button,
+ *  4) settings: source, queue, yellow slots, notifications.
  */
 class MainActivity : Activity() {
     private lateinit var head: LinearLayout
+    private lateinit var scroll: ScrollView
     private lateinit var lists: LinearLayout
     private lateinit var footer: TextView
     private lateinit var btn: TextView
     private lateinit var sourceRow: TextView
     private lateinit var queueRow: TextView
+    private lateinit var maybeRow: TextView
+    private lateinit var maybeSwitch: Switch
+    private lateinit var maybeCard: LinearLayout
+    private lateinit var notifyOffRow: TextView
+    private lateinit var notifyOnRow: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var busy = false
 
@@ -65,6 +72,32 @@ class MainActivity : Activity() {
         btn = pill("Оновити", Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
         sourceRow = settingRow { pickSource() }
         queueRow = settingRow { pickQueue() }
+        notifyOffRow = settingRow { onLeadRow(off = true) }
+        notifyOnRow = settingRow { onLeadRow(off = false) }
+        maybeRow = label(13f, Palette.GREY)
+        maybeSwitch = Switch(this).apply {
+            isClickable = false // the whole row handles the click
+            isFocusable = false
+            val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
+            thumbTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER, Palette.GREY))
+            trackTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER_DIM, Palette.LABEL))
+        }
+        maybeCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(8f).toInt(), dp(8f).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18f)
+                setColor(Palette.CARD)
+            }
+            addView(maybeRow, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(maybeSwitch)
+            setOnClickListener {
+                Settings.setMaybeIsOff(this@MainActivity, !Settings.maybeIsOff(this@MainActivity))
+                Fetcher.notifyAll(this@MainActivity)
+                render()
+            }
+        }
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -84,15 +117,26 @@ class MainActivity : Activity() {
             addView(sourceRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
                 bottomMargin = dp(6f).toInt()
             })
-            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(label(13f, Palette.WHITE, bold = true).apply {
+                text = "Сповіщення"
+                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
+            })
+            addView(notifyOffRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(notifyOnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
-        val scroll = ScrollView(this).apply {
+        scroll = ScrollView(this).apply {
             isFocusable = true
             isFocusableInTouchMode = true
             addView(col)
         }
         setContentView(scroll)
-        scroll.requestFocus() // обертання безеля прокручує екран
+        scroll.requestFocus() // rotating the bezel scrolls the screen
 
         if (System.currentTimeMillis() - Store.fetchedAt(this) > 2 * 60_000L) refreshNow()
     }
@@ -107,7 +151,7 @@ class MainActivity : Activity() {
         ui.removeCallbacks(tick)
     }
 
-    // ---------------------------------------------------------------- дії
+    // ---------------------------------------------------------------- actions
 
     private fun refreshNow() {
         if (busy) return
@@ -136,6 +180,58 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** Notifications on but blocked by the system: ask for permission first, otherwise pick the time. */
+    private fun onLeadRow(off: Boolean) {
+        val lead = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        if (lead > 0 && !Notify.enabled(this)) askNotificationPermission() else pickLead(off)
+    }
+
+    /** Pick the notification lead time; the list scrolls with the bezel. */
+    private fun pickLead(off: Boolean) {
+        val all = Notify.LEADS
+        val cur = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        AlertDialog.Builder(this)
+            .setTitle(if (off) "Перед вимкненням" else "Перед увімкненням")
+            .setSingleChoiceItems(all.map { Notify.leadLabel(it) }.toTypedArray(), all.indexOf(cur).coerceAtLeast(0)) { d, i ->
+                d.dismiss()
+                if (off) Settings.setNotify(this, off = all[i]) else Settings.setNotify(this, on = all[i])
+                if (all[i] > 0) askNotificationPermission()
+                Notify.schedule(this)
+                render()
+            }
+            .show()
+    }
+
+    /**
+     * Permission not asked yet, or may be asked again: show the system dialog.
+     * If denied permanently or turned off in settings: open the app's notification settings.
+     */
+    private fun askNotificationPermission() {
+        if (Notify.enabled(this)) return
+        val perm = android.Manifest.permission.POST_NOTIFICATIONS
+        val granted = android.os.Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val prefs = getSharedPreferences("notify", MODE_PRIVATE)
+        val askedBefore = prefs.getBoolean("asked", false)
+        if (!granted && (!askedBefore || shouldShowRequestPermissionRationale(perm))) {
+            prefs.edit().putBoolean("asked", true).apply()
+            requestPermissions(arrayOf(perm), 1)
+        } else {
+            runCatching {
+                startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Notify.schedule(this)
+        render()
+    }
+
     private fun pickQueue() {
         val all = Settings.QUEUES
         AlertDialog.Builder(this)
@@ -157,10 +253,18 @@ class MainActivity : Activity() {
         refreshNow()
     }
 
-    // ---------------------------------------------------------------- рендер
+    // ---------------------------------------------------------------- rendering
 
+    /** Rebuilding the content must keep the scroll position, otherwise a tap lands on the wrong row. */
     private fun render() {
-        val days = Store.load(this)
+        if (!::scroll.isInitialized) return renderContent()
+        val y = scroll.scrollY
+        renderContent()
+        scroll.post { scroll.scrollTo(0, y) }
+    }
+
+    private fun renderContent() {
+        val days = Store.load(this, Settings.maybeIsOff(this))
         val maybe = Store.loadMaybe(this)
         val now = ZonedDateTime.now(Schedule.ZONE)
         renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
@@ -184,12 +288,26 @@ class MainActivity : Activity() {
         } else if (!busy) sb.append("Ще не оновлювалось")
         val err = Store.error(this)
         err?.let { sb.append("\n⚠ ").append(it) }
+        val stale = Store.isStale(this)
+        if (stale && err == null) sb.insert(0, "⚠ ")
         footer.text = sb
-        footer.setTextColor(if (err != null) Palette.AMBER else Palette.LABEL)
+        footer.setTextColor(if (err != null || stale) Palette.AMBER else Palette.LABEL)
 
         val src = Settings.source(this)
         sourceRow.text = "Джерело\n${src.host}"
         queueRow.text = "Черга\n${Settings.queue(this)}"
+        val blocked = !Notify.enabled(this)
+        for ((row, title, lead) in listOf(
+            Triple(notifyOffRow, "Перед вимкненням", Settings.notifyOff(this)),
+            Triple(notifyOnRow, "Перед увімкненням", Settings.notifyOn(this)),
+        )) {
+            val warn = blocked && lead > 0
+            row.text = "$title\n${Notify.leadLabel(lead)}" + if (warn) "\n⚠ сповіщення заборонені" else ""
+            row.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
+        }
+        val maybeOff = Settings.maybeIsOff(this)
+        maybeRow.text = (if (maybeOff) "Жовте = OFF" else "Жовте = ON") + "\nу відліку"
+        maybeSwitch.isChecked = maybeOff
     }
 
     private fun renderHead(st: Schedule.Status?, now: ZonedDateTime, switching: Boolean) {
@@ -287,7 +405,7 @@ class MainActivity : Activity() {
         }
     }
 
-    // ---------------------------------------------------------------- віджети
+    // ---------------------------------------------------------------- widgets
 
     private fun settingRow(onClick: () -> Unit) = label(13f, Palette.GREY).apply {
         setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(14f).toInt(), dp(8f).toInt())
@@ -325,7 +443,7 @@ class MainActivity : Activity() {
     }
 }
 
-/** Горизонтальна смужка доби (48 слотів по 30 хв). */
+/** Horizontal strip of the day (48 slots of 30 min). */
 private class StripView(c: Context, val flags: BooleanArray, val maybe: BooleanArray?, val curSlot: Int) : View(c) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(cv: Canvas) {

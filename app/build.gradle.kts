@@ -17,11 +17,11 @@ android {
 
     buildTypes {
         release {
-            // R8: вирізає невикористаний код бібліотек — APK у рази менший, менше RAM на годиннику
+            // R8 strips unused library code: a much smaller APK and less RAM on the watch
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // особистий застосунок: підписуємо debug-ключем, щоб ставився поверх debug-версії
+            // personal app: sign with the debug key so it installs over the debug build
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -39,4 +39,5 @@ dependencies {
     implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.guava:guava:33.3.1-android")
+    testImplementation("junit:junit:4.13.2")
 }

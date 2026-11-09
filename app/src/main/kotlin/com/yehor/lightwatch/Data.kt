@@ -17,7 +17,7 @@ import java.net.HttpURLConnection
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
-/** Звідки беремо графік. Стани слотів: 0 — є світло, 1 — немає, 2 — перемикання (може не бути). */
+/** Where the schedule comes from. Slot states: 0 = power on, 1 = off, 2 = switching (may be off). */
 enum class Source(val host: String) {
     POE("poe.pl.ua"),
     BEZSVITLA("bezsvitla.com.ua"),
@@ -25,9 +25,9 @@ enum class Source(val host: String) {
 
     fun load(queue: String, today: LocalDate): Map<LocalDate, IntArray> = when (this) {
         POE -> {
-            // newgpv-info.php віддає HTML-таблицю всіх черг на дату; порожньо — графік ще не опубліковано
+            // newgpv-info.php returns an HTML table of all queues for the date; empty means not published yet
             val out = LinkedHashMap<LocalDate, IntArray>()
-            // графік на завтра POE публікує ввечері — до полудня не смикаємо зайвий запит
+            // POE publishes tomorrow's schedule in the evening, so skip that request before noon
             val noon = java.time.LocalTime.now(Schedule.ZONE).hour >= 12
             for (d in if (noon) listOf(today, today.plusDays(1)) else listOf(today)) {
                 val body = "seldate=" + java.net.URLEncoder.encode(
@@ -51,7 +51,7 @@ enum class Source(val host: String) {
 }
 
 object Http {
-    /** GET, або POST form-urlencoded, якщо є [form]. */
+    /** GET, or a form-urlencoded POST when [form] is given. */
     fun request(url: String, form: String? = null): String {
         val conn = java.net.URL(url).openConnection() as HttpURLConnection
         try {
@@ -78,7 +78,7 @@ object Http {
     }
 }
 
-/** Налаштування: джерело + черга. */
+/** Settings: source + queue, display and notification options. */
 object Settings {
     val QUEUES = (1..6).flatMap { q -> (1..2).map { "$q.$it" } }
 
@@ -89,7 +89,19 @@ object Settings {
 
     fun queue(c: Context): String = p(c).getString("queue", null)?.takeIf { it in QUEUES } ?: "3.2"
 
-    /** Зміна джерела/черги скидає кеш — старий графік вже не про нас. */
+    /** Whether "switching" (yellow) slots count as no power in the countdown (tile and complication). Defaults to true. */
+    fun maybeIsOff(c: Context): Boolean = p(c).getBoolean("maybeOff", true)
+
+    fun setMaybeIsOff(c: Context, v: Boolean) { p(c).edit().putBoolean("maybeOff", v).apply() }
+
+    /** How many minutes before power goes off / on to notify (0 = don't notify). */
+    fun notifyOff(c: Context): Int = p(c).getInt("notifyOff", 0)
+    fun notifyOn(c: Context): Int = p(c).getInt("notifyOn", 0)
+    fun setNotify(c: Context, off: Int = notifyOff(c), on: Int = notifyOn(c)) {
+        p(c).edit().putInt("notifyOff", off).putInt("notifyOn", on).apply()
+    }
+
+    /** Changing the source/queue clears the cache: the old schedule no longer applies. */
     fun set(c: Context, source: Source = source(c), queue: String = queue(c)) {
         if (source == source(c) && queue == queue(c)) return
         p(c).edit().putString("source", source.name).putString("queue", queue).apply()
@@ -97,11 +109,11 @@ object Settings {
     }
 }
 
-/** Кеш у SharedPreferences: "2026-11-08=0000111...;2026-11-09=..." (48 слотів по 30 хв). */
+/** Cache in SharedPreferences: "2026-11-08=0000111...;2026-11-09=..." (48 slots of 30 min). */
 object Store {
     private fun p(c: Context) = c.getSharedPreferences("sched", Context.MODE_PRIVATE)
 
-    /** Зливає нові дні зі старими (нові мають пріоритет), викидає дні старші за вчора. */
+    /** Merges new days into the old ones (new ones win) and drops days older than yesterday. */
     fun save(c: Context, fresh: Map<LocalDate, IntArray>) {
         val today = LocalDate.now(Schedule.ZONE)
         val merged = (raw(c) + fresh).filterKeys { !it.isBefore(today.minusDays(1)) }.toSortedMap()
@@ -110,7 +122,7 @@ object Store {
             .remove("error").apply()
     }
 
-    /** Стани слотів 0/1/2 по днях. */
+    /** Slot states 0/1/2 per day. */
     fun raw(c: Context): Map<LocalDate, IntArray> {
         val s = p(c).getString("days", null) ?: return emptyMap()
         return s.split(";").mapNotNull {
@@ -121,26 +133,32 @@ object Store {
         }.toMap()
     }
 
-    /** true — світла немає (у т.ч. "може не бути" під час перемикання). */
-    fun load(c: Context): Map<LocalDate, BooleanArray> =
-        raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] != 0 } }
+    /** true: no power (including "may be off" while switching). */
+    fun load(c: Context, maybeIsOff: Boolean = true): Map<LocalDate, BooleanArray> =
+        raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] == 1 || (maybeIsOff && a[it] == 2) } }
 
-    /** true — слот перемикання, світла може не бути. */
+    /** true: switching slot, power may be off. */
     fun loadMaybe(c: Context): Map<LocalDate, BooleanArray> =
         raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] == 2 } }
 
-    /** Що бачить користувач: графік + помилка. Час оновлення сюди навмисно не входить. */
+    /** What the user sees: schedule + error. The fetch time is deliberately left out. */
     fun snapshot(c: Context): String = (p(c).getString("days", "") ?: "") + "|" + (error(c) ?: "")
 
     fun clear(c: Context) { p(c).edit().clear().apply() }
 
     fun fetchedAt(c: Context): Long = p(c).getLong("fetched", 0L)
+    /** Data older than [STALE_WARN_MS]: show a warning, the schedule may have changed. */
+    fun isStale(c: Context, now: Long = System.currentTimeMillis()): Boolean =
+        fetchedAt(c).let { it > 0 && now - it > STALE_WARN_MS }
+
+    const val STALE_WARN_MS = 3 * 60 * 60_000L
+
     fun error(c: Context): String? = p(c).getString("error", null)
     fun setError(c: Context, msg: String) { p(c).edit().putString("error", msg).apply() }
 }
 
 object Fetcher {
-    /** Блокуючий виклик; true — успіх. Помилка пишеться в Store.error. */
+    /** Blocking call; true on success. The error is written to Store.error. */
     fun refresh(c: Context): Boolean = try { fetch(c) } catch (e: java.io.IOException) {
         Store.setError(c, "Немає з'єднання")
         false
@@ -154,28 +172,30 @@ object Fetcher {
         val queue = Settings.queue(c)
         val days = source.load(queue, LocalDate.now(Schedule.ZONE))
         if (days.isEmpty()) error("Графік черги $queue не знайдено")
-        // налаштування змінили, поки йшов запит — результат вже неактуальний
+        // settings changed while the request was in flight: the result is stale
         if (source != Settings.source(c) || queue != Settings.queue(c)) return false
         Store.save(c, days)
         return true
     }
 
-    /** Оновити кеш і перемалювати тайл + complication. */
+    /** Refresh the cache and redraw the tile + complication. */
     /**
-     * Оновити кеш і перемалювати тайл + complication — лише якщо графік або помилка змінились.
-     * Зазвичай POE віддає той самий графік, і будити циферблат дарма не треба
-     * ("оновлено HH:MM" на тайлі підтягнеться при його плановому перезапиті раз на 15 хв).
+     * Refresh the cache and redraw the tile + complication, but only if the schedule or the error changed.
+     * POE usually returns the same schedule, and there is no need to wake the watch face for nothing
+     * (the tile's "updated HH:MM" catches up on its regular 15-minute refresh).
      */
     fun refreshAndNotify(c: Context): Boolean {
         val before = Store.snapshot(c)
         val ok = refresh(c)
         if (Store.snapshot(c) != before) notifyAll(c)
+        Notify.schedule(c)
         return ok
     }
 
     fun notifyAll(c: Context) {
         TileService.getUpdater(c).requestUpdate(LightTileService::class.java)
         LightComplicationService.requestUpdate(c)
+        Notify.schedule(c)
     }
 }
 
@@ -190,16 +210,16 @@ object Refresh {
     private val net = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
     private const val STALE_MS = 15 * 60_000L
 
-    /** Періодичне оновлення раз на 15 хв (мінімум WorkManager). POE може змінити графік будь-коли. */
+    /** Periodic refresh every 15 min (the WorkManager minimum). POE can change the schedule at any time. */
     fun ensure(c: Context) {
-        WorkManager.getInstance(c).cancelUniqueWork("periodic") // стара 30-хвилинна задача
+        WorkManager.getInstance(c).cancelUniqueWork("periodic") // old 30-minute job
         WorkManager.getInstance(c).enqueueUniquePeriodicWork(
             "periodic15", ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<RefreshWorker>(15, TimeUnit.MINUTES).setConstraints(net).build()
         )
     }
 
-    /** Разове оновлення зараз. */
+    /** One-off refresh now. */
     fun now(c: Context) {
         WorkManager.getInstance(c).enqueueUniqueWork(
             "once", ExistingWorkPolicy.KEEP,
@@ -207,7 +227,7 @@ object Refresh {
         )
     }
 
-    /** ensure() + разове оновлення, якщо кеш застарів. */
+    /** ensure() + a one-off refresh if the cache is stale. */
     fun ifStale(c: Context) {
         ensure(c)
         if (System.currentTimeMillis() - Store.fetchedAt(c) > STALE_MS) now(c)

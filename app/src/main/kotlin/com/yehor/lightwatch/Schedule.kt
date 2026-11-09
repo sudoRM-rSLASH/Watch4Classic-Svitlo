@@ -7,12 +7,12 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
- * Чиста логіка без Android-залежностей.
+ * Pure logic with no Android dependencies.
  *
- * Дані: для кожної дати 48 прапорців (півгодинні слоти), true = світла НЕМАЄ.
+ * Data: 48 flags per date (half-hour slots), true = NO power.
  */
 object Schedule {
-    val ZONE: ZoneId = ZoneId.of("Europe/Kiev") // "Kyiv" немає в старих tzdata
+    val ZONE: ZoneId = ZoneId.of("Europe/Kiev") // "Kyiv" is missing from older tzdata
     const val SLOTS = 48
 
     // ---------------------------------------------------------------- energy-ua.info
@@ -26,7 +26,7 @@ object Schedule {
         RegexOption.DOT_MATCHES_ALL
     )
 
-    /** energy-ua.info: погодинна шкала; дні без повних 24 годин пропускаються. */
+    /** energy-ua.info: hourly scale; days without all 24 hours are skipped. */
     fun parseEnergyUa(html: String, today: LocalDate): Map<LocalDate, BooleanArray> {
         val out = LinkedHashMap<LocalDate, BooleanArray>()
         for (day in EU_DAY_RE.findAll(html)) {
@@ -62,8 +62,8 @@ object Schedule {
     )
 
     /**
-     * bezsvitla.com.ua/poltavska-oblast: картки всіх черг ("<strong>Черга 3.2</strong>"),
-     * у кожній JSON в атрибутах data-schedule-intervals (сьогодні) і data-schedule-tomorrow, крок 30 хв.
+     * bezsvitla.com.ua/poltavska-oblast: cards for all queues ("<strong>Черга 3.2</strong>"),
+     * each with JSON in data-schedule-intervals (today) and data-schedule-tomorrow, 30-minute steps.
      */
     fun parseBezsvitla(page: String, today: LocalDate, queue: String): Map<LocalDate, BooleanArray> {
         val html = bezsvitlaCard(page, queue) ?: return emptyMap()
@@ -77,7 +77,7 @@ object Schedule {
         return out
     }
 
-    /** Шматок сторінки з карткою черги, де є графік. */
+    /** The part of the page with the queue's card that holds the schedule. */
     private fun bezsvitlaCard(page: String, queue: String): String? {
         val marker = "<strong>Черга $queue</strong>"
         var i = page.indexOf(marker)
@@ -90,7 +90,7 @@ object Schedule {
         return null
     }
 
-    /** Список інтервалів → 48 прапорців; null, якщо доба покрита не повністю. */
+    /** Interval list to 48 flags; null if the day is not fully covered. */
     private fun intervals(json: String): BooleanArray? {
         val flags = BooleanArray(SLOTS)
         val seen = BooleanArray(SLOTS)
@@ -116,12 +116,12 @@ object Schedule {
     private val POE_CELL_RE = Regex("""<td class="gpv-c gpv-s(\d)""")
 
     /**
-     * poe.pl.ua/customs/newgpv-info.php: таблиця gpv-table, рядок на чергу, 48 клітинок
-     * gpv-s1 (є), gpv-s2 (немає), gpv-s3 (перемикання). Повертає 0/1/2 або null.
+     * poe.pl.ua/customs/newgpv-info.php: a gpv-table with one row per queue, 48 cells
+     * gpv-s1 (on), gpv-s2 (off), gpv-s3 (switching). Returns 0/1/2 or null.
      */
     fun parsePoe(html: String, queue: String): IntArray? {
-        // друга (вертикальна) таблиця дублює першу — беремо тільки горизонтальну
-        // (обидві назви класів трапляються ще й у CSS, тому шукаємо після div gpv-hview)
+        // the second (vertical) table duplicates the first: use only the horizontal one
+        // (both class names also appear in the CSS, so search after the gpv-hview div)
         val start = html.indexOf("class=\"gpv-hview").let { if (it < 0) 0 else it }
         val end = html.indexOf("class=\"gpv-vview", start).let { if (it < 0) html.length else it }
         val h = html.substring(start, end)
@@ -134,24 +134,24 @@ object Schedule {
         return null
     }
 
-    // ---------------------------------------------------------------- стан
+    // ---------------------------------------------------------------- state
 
     data class Status(
-        /** true — світла зараз немає */
+        /** true: no power right now */
         val off: Boolean,
-        /** коли почалась поточна фаза (або початок відомих даних) */
+        /** when the current phase started (or where the known data begins) */
         val since: ZonedDateTime,
-        /** коли зміниться стан (або кінець відомих даних) */
+        /** when the state changes (or where the known data ends) */
         val changeAt: ZonedDateTime,
-        /** дані закінчились раніше, ніж змінився стан → реально щонайменше до changeAt */
+        /** data ran out before the state changed, so it really lasts at least until changeAt */
         val changeIsMinimum: Boolean,
-        /** кінець наступної фази, null якщо невідомо */
+        /** end of the next phase, null if unknown */
         val nextEnd: ZonedDateTime?,
         val nextEndIsMinimum: Boolean,
     ) {
         fun remaining(now: ZonedDateTime): Duration = Duration.between(now, changeAt)
         val nextLen: Duration? get() = nextEnd?.let { Duration.between(changeAt, it) }
-        /** Частка пройденої поточної фази 0..1. */
+        /** Elapsed fraction of the current phase, 0..1. */
         fun progress(now: ZonedDateTime): Float {
             val total = Duration.between(since, changeAt).seconds.toFloat()
             if (total <= 0f) return 0f
@@ -199,7 +199,7 @@ object Schedule {
         return Status(cur, since, change, false, end ?: u, end == null)
     }
 
-    /** Моменти майбутніх змін стану (для таймлайнів), не більше [max]. */
+    /** Times of upcoming state changes (for timelines), at most [max]. */
     fun changes(days: Map<LocalDate, BooleanArray>, now: ZonedDateTime, max: Int = 8): List<ZonedDateTime> {
         val out = ArrayList<ZonedDateTime>()
         var prev = at(days, now) ?: return out
@@ -213,13 +213,13 @@ object Schedule {
         return out
     }
 
-    /** Наступні [n] слотів від поточного (null — немає даних). */
+    /** The next [n] slots from the current one (null = no data). */
     fun upcoming(days: Map<LocalDate, BooleanArray>, now: ZonedDateTime, n: Int): List<Boolean?> {
         var t = slotStart(now)
         return List(n) { at(days, t).also { t = t.plusMinutes(30) } }
     }
 
-    /** Відрізки без світла за день: [(з, до)] у слотах, "до" може бути 48. */
+    /** Outage ranges for a day: [(from, to)] in slots, "to" may be 48. */
     fun offRanges(flags: BooleanArray): List<Pair<Int, Int>> {
         val out = ArrayList<Pair<Int, Int>>()
         var i = 0
@@ -235,7 +235,7 @@ object Schedule {
 
     fun offDuration(flags: BooleanArray): Duration = Duration.ofMinutes(flags.count { it } * 30L)
 
-    /** "2г 17хв" / "34хв" / "3г" */
+    /** "2г 17хв" / "34хв" / "3г" (h/min) */
     fun fmt(d: Duration): String {
         val m = d.toMinutes().coerceAtLeast(0)
         val h = m / 60
@@ -247,6 +247,6 @@ object Schedule {
         }
     }
 
-    /** Слот → "HH:MM" (48 → "24:00"). */
+    /** Slot to "HH:MM" (48 → "24:00"). */
     fun slotTime(s: Int): String = "%02d:%02d".format(s / 2, (s % 2) * 30)
 }
