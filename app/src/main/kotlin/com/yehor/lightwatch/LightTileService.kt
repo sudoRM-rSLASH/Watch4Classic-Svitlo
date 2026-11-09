@@ -133,8 +133,8 @@ class LightTileService : TileService() {
             }
             row.addContent(
                 Box.Builder()
-                    .setWidth(dp(4.5f))
-                    .setHeight(dp(if (i == 0) 12f else 8f))
+                    .setWidth(dp(5f))
+                    .setHeight(dp(if (i == 0) 13f else 9f))
                     .setModifiers(
                         ModifiersBuilders.Modifiers.Builder()
                             .setBackground(
@@ -150,7 +150,7 @@ class LightTileService : TileService() {
         }
         val labels = Row.Builder()
             .addContent(text("зараз", 9f, LABEL))
-            .addContent(Spacer.Builder().setWidth(dp(70f)).build())
+            .addContent(Spacer.Builder().setWidth(dp(80f)).build())
             .addContent(text("+12г", 9f, LABEL))
         return Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
@@ -169,7 +169,7 @@ class LightTileService : TileService() {
     ): LayoutElement {
         val col = Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(text("ЧЕРГА $queue", 10f, LABEL, bold = true))
+            .addContent(text("ЧЕРГА $queue", 12f, LABEL, bold = true))
             .addContent(gap(6f))
 
         if (st == null) {
@@ -182,7 +182,7 @@ class LightTileService : TileService() {
             val switching = Schedule.at(maybe, now) == true
             val color = when { switching -> AMBER; st.off -> RED; else -> GREEN }
             val title = when { switching -> "ПЕРЕМИКАННЯ"; st.off -> "СВІТЛА НЕМАЄ"; else -> "СВІТЛО Є" }
-            col.addContent(text(title, 13f, color, bold = true))
+            col.addContent(text(title, 15f, color, bold = true))
                 .addContent(gap(2f))
                 .addContent(
                     countdown(st, now)
@@ -195,13 +195,13 @@ class LightTileService : TileService() {
                             st.off -> "увімкнуть о ${hhmm(st.changeAt)}"
                             else -> "вимкнуть о ${hhmm(st.changeAt)}"
                         },
-                        13f, GREY
+                        15f, GREY
                     )
                 )
             st.nextLen?.let {
                 val what = if (st.off) "зі світлом" else "без світла"
                 col.addContent(gap(2f))
-                    .addContent(text("далі ${if (st.nextEndIsMinimum) "≥ " else ""}${Schedule.fmt(it)} $what", 11f, LABEL))
+                    .addContent(text("далі ${if (st.nextEndIsMinimum) "≥ " else ""}${Schedule.fmt(it)} $what", 13f, LABEL))
             }
             col.addContent(gap(8f)).addContent(strip(days, now))
         }
@@ -210,8 +210,8 @@ class LightTileService : TileService() {
             val t = java.time.Instant.ofEpochMilli(fetched).atZone(Schedule.ZONE)
             col.addContent(gap(6f))
                 .addContent(
-                    if (err != null) text("⚠ дані від ${hhmm(t)}", 10f, AMBER)
-                    else text("оновлено ${hhmm(t)}", 10f, LABEL)
+                    if (err != null) text("⚠ дані від ${hhmm(t)}", 12f, AMBER)
+                    else text("оновлено ${hhmm(t)}", 12f, LABEL)
                 )
         }
         return Box.Builder()
@@ -253,7 +253,7 @@ class LightTileService : TileService() {
             .setMaxLines(1)
             .setFontStyle(
                 FontStyle.Builder()
-                    .setSize(sp(30f))
+                    .setSize(sp(37f))
                     .setColor(argb(WHITE))
                     .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
                     .build()
