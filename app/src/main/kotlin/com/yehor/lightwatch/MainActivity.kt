@@ -33,6 +33,7 @@ import kotlin.concurrent.thread
  */
 class MainActivity : Activity() {
     private lateinit var head: LinearLayout
+    private lateinit var scroll: ScrollView
     private lateinit var lists: LinearLayout
     private lateinit var footer: TextView
     private lateinit var btn: TextView
@@ -117,7 +118,7 @@ class MainActivity : Activity() {
             })
             addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
-        val scroll = ScrollView(this).apply {
+        scroll = ScrollView(this).apply {
             isFocusable = true
             isFocusableInTouchMode = true
             addView(col)
@@ -190,7 +191,15 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- rendering
 
+    /** Rebuilding the content must keep the scroll position, otherwise a tap lands on the wrong row. */
     private fun render() {
+        if (!::scroll.isInitialized) return renderContent()
+        val y = scroll.scrollY
+        renderContent()
+        scroll.post { scroll.scrollTo(0, y) }
+    }
+
+    private fun renderContent() {
         val days = Store.load(this, Settings.maybeIsOff(this))
         val maybe = Store.loadMaybe(this)
         val now = ZonedDateTime.now(Schedule.ZONE)
