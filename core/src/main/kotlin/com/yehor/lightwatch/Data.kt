@@ -1,7 +1,6 @@
 package com.yehor.lightwatch
 
 import android.content.Context
-import androidx.wear.tiles.TileService
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -192,9 +191,9 @@ object Fetcher {
         return ok
     }
 
+    /** Redraw every surface of the host app (tile/complication on the watch, widget on the phone) and reschedule reminders. */
     fun notifyAll(c: Context) {
-        TileService.getUpdater(c).requestUpdate(LightTileService::class.java)
-        LightComplicationService.requestUpdate(c)
+        Surfaces.onChange?.invoke(c.applicationContext)
         Notify.schedule(c)
     }
 }

@@ -19,15 +19,19 @@ jobs:
         with:
           gradle-version: 8.9
       - name: Unit tests
-        run: gradle --no-daemon :app:testReleaseUnitTest
-      - name: Assemble release APK
-        run: gradle --no-daemon :app:assembleRelease
+        run: gradle --no-daemon :core:testReleaseUnitTest
+      - name: Assemble release APKs
+        run: gradle --no-daemon :app:assembleRelease :phone:assembleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: svitlo-release
           path: app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
+        with:
+          name: svitlo-phone-release
+          path: phone/build/outputs/apk/release/phone-release.apk
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-report
-          path: app/build/reports/tests/
+          path: core/build/reports/tests/

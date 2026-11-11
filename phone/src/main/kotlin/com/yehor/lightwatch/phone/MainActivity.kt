@@ -1,0 +1,511 @@
+package com.yehor.lightwatch.phone
+
+import com.yehor.lightwatch.Fetcher
+import com.yehor.lightwatch.Notify
+import com.yehor.lightwatch.Palette
+import com.yehor.lightwatch.Refresh
+import com.yehor.lightwatch.Schedule
+import com.yehor.lightwatch.Settings
+import com.yehor.lightwatch.Source
+import com.yehor.lightwatch.Store
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Switch
+import android.widget.TextView
+import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import kotlin.concurrent.thread
+
+/**
+ * Phone app screen (port of the watch screen, scaled for a phone):
+ *  1) status and countdown,
+ *  2) outages for today / tomorrow,
+ *  3) last update time, "Оновити" (refresh) button,
+ *  4) settings: source, queue, yellow slots, notifications, live countdown notification.
+ */
+class MainActivity : Activity() {
+    private lateinit var head: LinearLayout
+    private lateinit var scroll: ScrollView
+    private lateinit var lists: LinearLayout
+    private lateinit var footer: TextView
+    private lateinit var btn: TextView
+    private lateinit var sourceRow: TextView
+    private lateinit var queueRow: TextView
+    private lateinit var maybeRow: TextView
+    private lateinit var maybeSwitch: Switch
+    private lateinit var maybeCard: LinearLayout
+    private lateinit var notifyOffRow: TextView
+    private lateinit var notifyOnRow: TextView
+    private lateinit var liveRow: TextView
+    private val ui = Handler(Looper.getMainLooper())
+    private var busy = false
+
+    private val tick = object : Runnable {
+        override fun run() {
+            render()
+            ui.postDelayed(this, 30_000)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Refresh.ensure(this)
+        window.decorView.setBackgroundColor(Palette.BG)
+
+        val side = dp(20f).toInt()
+
+        head = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(12f).toInt(), 0, dp(12f).toInt())
+        }
+        lists = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        footer = label(14f, Palette.LABEL).apply { gravity = Gravity.CENTER }
+        btn = pill("Оновити", Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
+        sourceRow = settingRow { pickSource() }
+        queueRow = settingRow { pickQueue() }
+        notifyOffRow = settingRow { onLeadRow(off = true) }
+        notifyOnRow = settingRow { onLeadRow(off = false) }
+        liveRow = settingRow { pickLive() }
+        maybeRow = label(17f, Palette.GREY)
+        maybeSwitch = Switch(this).apply {
+            isClickable = false // the whole row handles the click
+            isFocusable = false
+            val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
+            thumbTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER, Palette.GREY))
+            trackTintList = android.content.res.ColorStateList(states, intArrayOf(Palette.AMBER_DIM, Palette.LABEL))
+        }
+        maybeCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(8f).toInt(), dp(8f).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16f)
+                setColor(Palette.CARD)
+            }
+            addView(maybeRow, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            addView(maybeSwitch)
+            setOnClickListener {
+                Settings.setMaybeIsOff(this@MainActivity, !Settings.maybeIsOff(this@MainActivity))
+                Fetcher.notifyAll(this@MainActivity)
+                render()
+            }
+        }
+
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(side, dp(16f).toInt(), side, dp(32f).toInt())
+            addView(head, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(lists)
+            addView(footer, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                topMargin = dp(14f).toInt()
+            })
+            addView(btn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                topMargin = dp(8f).toInt()
+            })
+            addView(label(17f, Palette.WHITE, bold = true).apply {
+                text = "Налаштування"
+                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
+            })
+            addView(sourceRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(label(17f, Palette.WHITE, bold = true).apply {
+                text = "Сповіщення"
+                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
+            })
+            addView(notifyOffRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(notifyOnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(liveRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+        scroll = ScrollView(this).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            addView(col)
+        }
+        setContentView(scroll)
+        // edge-to-edge: keep content clear of the status and navigation bars
+        scroll.setOnApplyWindowInsetsListener { v, insets ->
+            val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        scroll.clipToPadding = false
+
+        if (System.currentTimeMillis() - Store.fetchedAt(this) > 2 * 60_000L) refreshNow()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ui.post(tick)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ui.removeCallbacks(tick)
+    }
+
+    // ---------------------------------------------------------------- actions
+
+    private fun refreshNow() {
+        if (busy) return
+        busy = true
+        btn.text = "Оновлення…"
+        btn.alpha = 0.6f
+        thread {
+            Fetcher.refreshAndNotify(applicationContext)
+            runOnUiThread {
+                busy = false
+                btn.text = "Оновити"
+                btn.alpha = 1f
+                render()
+            }
+        }
+    }
+
+    private fun pickSource() {
+        val all = Source.entries
+        AlertDialog.Builder(this)
+            .setTitle("Джерело")
+            .setSingleChoiceItems(all.map { it.host }.toTypedArray(), all.indexOf(Settings.source(this))) { d, i ->
+                d.dismiss()
+                applySettings { Settings.set(this, source = all[i]) }
+            }
+            .show()
+    }
+
+    /** Notifications on but blocked by the system: ask for permission first, otherwise pick the time. */
+    private fun onLeadRow(off: Boolean) {
+        val lead = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        if (lead > 0 && !Notify.enabled(this)) askNotificationPermission() else pickLead(off)
+    }
+
+    /** Live countdown notification: off / always / only shortly before a change. */
+    private fun pickLive() {
+        val all = LiveNote.MODES
+        AlertDialog.Builder(this)
+            .setTitle("Відлік у сповіщенні")
+            .setSingleChoiceItems(all.map { LiveNote.label(it) }.toTypedArray(), all.indexOf(LiveNote.mode(this)).coerceAtLeast(0)) { d, i ->
+                d.dismiss()
+                LiveNote.setMode(this, all[i])
+                if (all[i] >= 0) askNotificationPermission()
+                Ticker.refresh(this)
+                render()
+            }
+            .show()
+    }
+
+    /** Pick the notification lead time. */
+    private fun pickLead(off: Boolean) {
+        val all = Notify.LEADS
+        val cur = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
+        AlertDialog.Builder(this)
+            .setTitle(if (off) "Перед вимкненням" else "Перед увімкненням")
+            .setSingleChoiceItems(all.map { Notify.leadLabel(it) }.toTypedArray(), all.indexOf(cur).coerceAtLeast(0)) { d, i ->
+                d.dismiss()
+                if (off) Settings.setNotify(this, off = all[i]) else Settings.setNotify(this, on = all[i])
+                if (all[i] > 0) askNotificationPermission()
+                Notify.schedule(this)
+                render()
+            }
+            .show()
+    }
+
+    /**
+     * Permission not asked yet, or may be asked again: show the system dialog.
+     * If denied permanently or turned off in settings: open the app's notification settings.
+     */
+    private fun askNotificationPermission() {
+        if (Notify.enabled(this)) return
+        val perm = android.Manifest.permission.POST_NOTIFICATIONS
+        val granted = android.os.Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val prefs = getSharedPreferences("notify", MODE_PRIVATE)
+        val askedBefore = prefs.getBoolean("asked", false)
+        if (!granted && (!askedBefore || shouldShowRequestPermissionRationale(perm))) {
+            prefs.edit().putBoolean("asked", true).apply()
+            requestPermissions(arrayOf(perm), 1)
+        } else {
+            runCatching {
+                startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Notify.schedule(this)
+        Ticker.refresh(this)
+        render()
+    }
+
+    private fun pickQueue() {
+        val all = Settings.QUEUES
+        AlertDialog.Builder(this)
+            .setTitle("Черга")
+            .setSingleChoiceItems(all.map { "Черга $it" }.toTypedArray(), all.indexOf(Settings.queue(this))) { d, i ->
+                d.dismiss()
+                applySettings { Settings.set(this, queue = all[i]) }
+            }
+            .show()
+    }
+
+    private fun applySettings(change: () -> Unit) {
+        val before = Settings.source(this) to Settings.queue(this)
+        change()
+        if (before == Settings.source(this) to Settings.queue(this)) return
+        Fetcher.notifyAll(this)
+        render()
+        busy = false
+        refreshNow()
+    }
+
+    // ---------------------------------------------------------------- rendering
+
+    /** Rebuilding the content must keep the scroll position, otherwise a tap lands on the wrong row. */
+    private fun render() {
+        if (!::scroll.isInitialized) return renderContent()
+        val y = scroll.scrollY
+        renderContent()
+        scroll.post { scroll.scrollTo(0, y) }
+    }
+
+    private fun renderContent() {
+        val days = Store.load(this, Settings.maybeIsOff(this))
+        val maybe = Store.loadMaybe(this)
+        val now = ZonedDateTime.now(Schedule.ZONE)
+        renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
+
+        lists.removeAllViews()
+        val today = now.toLocalDate()
+        dayBlock("Сьогодні", days[today], maybe[today], Schedule.slotOf(now))
+        dayBlock("Завтра", days[today.plusDays(1)], maybe[today.plusDays(1)], -1)
+        if (maybe.values.any { m -> m.any { it } }) {
+            lists.addView(label(14f, Palette.LABEL).apply {
+                text = "жовте — перемикання, світла може не бути"
+                setPadding(0, dp(8f).toInt(), 0, 0)
+            })
+        }
+
+        val sb = StringBuilder()
+        val fetched = Store.fetchedAt(this)
+        if (fetched > 0) {
+            val t = Instant.ofEpochMilli(fetched).atZone(Schedule.ZONE)
+            sb.append("Оновлено ").append(t.format(if (t.toLocalDate() == today) HHMM else DDHHMM))
+        } else if (!busy) sb.append("Ще не оновлювалось")
+        val err = Store.error(this)
+        err?.let { sb.append("\n⚠ ").append(it) }
+        val stale = Store.isStale(this)
+        if (stale && err == null) sb.insert(0, "⚠ ")
+        footer.text = sb
+        footer.setTextColor(if (err != null || stale) Palette.AMBER else Palette.LABEL)
+
+        val src = Settings.source(this)
+        sourceRow.text = "Джерело\n${src.host}"
+        queueRow.text = "Черга\n${Settings.queue(this)}"
+        val blocked = !Notify.enabled(this)
+        for ((row, title, lead) in listOf(
+            Triple(notifyOffRow, "Перед вимкненням", Settings.notifyOff(this)),
+            Triple(notifyOnRow, "Перед увімкненням", Settings.notifyOn(this)),
+        )) {
+            val warn = blocked && lead > 0
+            row.text = "$title\n${Notify.leadLabel(lead)}" + if (warn) "\n⚠ сповіщення заборонені" else ""
+            row.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
+        }
+        val live = LiveNote.mode(this)
+        val liveWarn = blocked && live >= 0
+        liveRow.text = "Відлік у сповіщенні\n${LiveNote.label(live)}" +
+            (if (liveWarn) "\n⚠ сповіщення заборонені" else if (live >= 0) "\nна Samsung — у Now Bar на екрані блокування" else "")
+        liveRow.setTextColor(if (liveWarn) Palette.AMBER else Palette.GREY)
+        val maybeOff = Settings.maybeIsOff(this)
+        maybeRow.text = (if (maybeOff) "Жовте = OFF" else "Жовте = ON") + "\nу відліку"
+        maybeSwitch.isChecked = maybeOff
+    }
+
+    private fun renderHead(st: Schedule.Status?, now: ZonedDateTime, switching: Boolean) {
+        head.removeAllViews()
+        fun add(v: View, top: Float = 0f) = head.addView(v, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            topMargin = dp(top).toInt()
+        })
+        add(label(14f, Palette.LABEL, bold = true).apply {
+            text = "ЧЕРГА ${Settings.queue(this@MainActivity)}"
+            letterSpacing = 0.1f
+        })
+        if (st == null) {
+            add(label(21f, Palette.GREY, bold = true).apply { text = "Немає даних" }, 18f)
+            add(label(16f, Palette.LABEL).apply {
+                text = if (busy) "завантажую…" else "натисни «Оновити»"
+                gravity = Gravity.CENTER
+            }, 4f)
+            return
+        }
+        val color = when { switching -> Palette.AMBER; st.off -> Palette.RED; else -> Palette.GREEN }
+        val title = when { switching -> "  ПЕРЕМИКАННЯ  "; st.off -> "  СВІТЛА НЕМАЄ  "; else -> "  СВІТЛО Є  " }
+        add(pill(title, color, Palette.BG, 16f).apply {
+            setPadding(dp(10f).toInt(), dp(4f).toInt(), dp(10f).toInt(), dp(4f).toInt())
+        }, 10f)
+        add(label(44f, Palette.WHITE, bold = true).apply {
+            text = (if (st.changeIsMinimum) "≥ " else "") + Schedule.fmt(st.remaining(now))
+        }, 4f)
+        val at = hhmm(st.changeAt, now)
+        add(label(18f, Palette.GREY).apply {
+            text = when {
+                st.changeIsMinimum -> "без змін до $at"
+                st.off -> "увімкнуть о $at"
+                else -> "вимкнуть о $at"
+            }
+        })
+        st.nextLen?.let {
+            val what = if (st.off) "зі світлом" else "без світла"
+            add(label(16f, Palette.LABEL).apply {
+                text = "далі ${if (st.nextEndIsMinimum) "≥ " else ""}${Schedule.fmt(it)} $what"
+            }, 2f)
+        }
+    }
+
+    private fun dayBlock(title: String, flags: BooleanArray?, maybe: BooleanArray?, curSlot: Int) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(14f).toInt(), 0, dp(6f).toInt())
+        }
+        row.addView(label(18f, Palette.WHITE, bold = true).apply { text = title; maxLines = 1 },
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+        row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        row.addView(label(16f, Palette.LABEL).apply {
+            text = when {
+                flags == null -> ""
+                flags.none { it } -> "без відключень"
+                else -> "−${Schedule.fmt(Schedule.offDuration(flags))}"
+            }
+            if (flags != null && flags.any { it }) setTextColor(Palette.RED)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(6f).toInt() })
+        lists.addView(row)
+
+        if (flags == null) {
+            lists.addView(label(17f, Palette.LABEL).apply { text = "Графіка ще немає" })
+            return
+        }
+        lists.addView(StripView(this, flags, maybe, curSlot), LinearLayout.LayoutParams(MATCH_PARENT, dp(14f).toInt()).apply {
+            bottomMargin = dp(6f).toInt()
+        })
+        val ranges = Schedule.offRanges(flags)
+        if (ranges.isEmpty()) lists.addView(label(17f, Palette.GREEN).apply { text = "Світло весь день" })
+        for ((a, b) in ranges) {
+            val past = curSlot >= 0 && b <= curSlot
+            val active = curSlot in a until b
+            lists.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(3f).toInt(), 0, dp(3f).toInt())
+                addView(View(context).apply {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(if (past) Palette.RED_DIM else Palette.RED)
+                    }
+                }, LinearLayout.LayoutParams(dp(8f).toInt(), dp(8f).toInt()).apply { rightMargin = dp(8f).toInt() })
+                addView(label(18f, if (past) Palette.LABEL else Palette.GREY, bold = active).apply {
+                    text = "${Schedule.slotTime(a)} – ${Schedule.slotTime(b)}"
+                }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+                addView(label(16f, if (active) Palette.RED else Palette.LABEL).apply {
+                    text = if (active) "зараз" else Schedule.fmt(java.time.Duration.ofMinutes((b - a) * 30L))
+                })
+            })
+        }
+    }
+
+    // ---------------------------------------------------------------- widgets
+
+    private fun settingRow(onClick: () -> Unit) = label(17f, Palette.GREY).apply {
+        setPadding(dp(16f).toInt(), dp(12f).toInt(), dp(16f).toInt(), dp(12f).toInt())
+        background = GradientDrawable().apply {
+            cornerRadius = dp(16f)
+            setColor(Palette.CARD)
+        }
+        setOnClickListener { onClick() }
+    }
+
+    private fun pill(s: String, bg: Int, fg: Int, size: Float = 15f) = label(size, fg, bold = true).apply {
+        text = s
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            cornerRadius = dp(24f)
+            setColor(bg)
+        }
+        setPadding(0, dp(10f).toInt(), 0, dp(10f).toInt())
+    }
+
+    private fun label(sp: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+        setTextColor(color)
+        if (bold) typeface = Typeface.DEFAULT_BOLD
+    }
+
+    private fun dp(v: Float) = v * resources.displayMetrics.density
+
+    private fun hhmm(t: ZonedDateTime, now: ZonedDateTime): String =
+        if (t.hour == 0 && t.minute == 0 && t.toLocalDate() != now.toLocalDate()) "24:00" else t.format(HHMM)
+
+    private companion object {
+        val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        val DDHHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
+    }
+}
+
+/** Horizontal strip of the day (48 slots of 30 min). */
+private class StripView(c: Context, val flags: BooleanArray, val maybe: BooleanArray?, val curSlot: Int) : View(c) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    override fun onDraw(cv: Canvas) {
+        val n = flags.size
+        val gap = resources.displayMetrics.density * 0.75f
+        val cw = (width - gap * (n - 1)) / n
+        val r = cw / 2
+        for (i in 0 until n) {
+            val past = curSlot >= 0 && i < curSlot
+            val m = maybe?.getOrNull(i) == true
+            p.color = when {
+                m && past -> Palette.AMBER_DIM
+                m -> Palette.AMBER
+                flags[i] && past -> Palette.RED_DIM
+                flags[i] -> Palette.RED
+                past -> Palette.GREEN_DIM
+                else -> Palette.GREEN
+            }
+            val x = i * (cw + gap)
+            val top = if (i == curSlot) 0f else height * 0.2f
+            val bottom = if (i == curSlot) height.toFloat() else height * 0.8f
+            cv.drawRoundRect(x, top, x + cw, bottom, r, r, p)
+        }
+    }
+}

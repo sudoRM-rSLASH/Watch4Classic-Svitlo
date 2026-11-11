@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.yehor.lightwatch.core.R
 import java.time.Instant
 import java.time.ZonedDateTime
 
@@ -106,9 +107,8 @@ object Notify {
         val hm = "%02d:%02d".format(at.hour, at.minute)
         val title = if (off) "Світло вимкнуть о $hm" else "Світло увімкнуть о $hm"
         val text = if (min > 0) "через $min хв · черга ${Settings.queue(c)}" else "черга ${Settings.queue(c)}"
-        val open = PendingIntent.getActivity(
-            c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
-        )
+        val launch = c.packageManager.getLaunchIntentForPackage(c.packageName) ?: Intent()
+        val open = PendingIntent.getActivity(c, 0, launch, PendingIntent.FLAG_IMMUTABLE)
         val n = android.app.Notification.Builder(c, CHANNEL)
             .setSmallIcon(if (off) R.drawable.ic_bolt_off_mono else R.drawable.ic_bolt_mono)
             .setContentTitle(title)

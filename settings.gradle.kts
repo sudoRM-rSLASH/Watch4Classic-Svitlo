@@ -13,4 +13,6 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "lightwatch"
-include(":app")
+include(":app")  // Wear OS app
+include(":core")
+include(":phone")

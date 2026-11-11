@@ -2,6 +2,8 @@
 /.gradle/
 /build/
 /app/build/
+/core/build/
+/phone/build/
 /.kotlin/
 
 # Local machine
