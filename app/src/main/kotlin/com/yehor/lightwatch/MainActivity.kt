@@ -47,10 +47,18 @@ class MainActivity : Activity() {
     private val ui = Handler(Looper.getMainLooper())
     private var busy = false
 
+    /** What the lists and the footer were built for: the day, the half-hour slot, the data and its error. */
+    private var shownSlot = ""
+
+    private fun slotKey(now: ZonedDateTime) =
+        "${now.toLocalDate()}#${Schedule.slotOf(now)}#${Store.fetchedAt(this)}#${Store.error(this)}"
+
     private val tick = object : Runnable {
         override fun run() {
-            render()
-            ui.postDelayed(this, 30_000)
+            // Between slot changes only the countdown in the header moves: don't rebuild the whole screen
+            if (slotKey(ZonedDateTime.now(Schedule.ZONE)) != shownSlot) render() else updateHead()
+            // The countdown is in whole minutes: wake up on the minute boundary instead of every 30 s
+            ui.postDelayed(this, 60_000L - System.currentTimeMillis() % 60_000L + 100L)
         }
     }
 
@@ -143,6 +151,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        shownSlot = "" // the data may have changed while the screen was off: rebuild everything once
         ui.post(tick)
     }
 
@@ -263,10 +272,19 @@ class MainActivity : Activity() {
         scroll.post { scroll.scrollTo(0, y) }
     }
 
+    /** Only the header (state and countdown): cheap, runs every minute. */
+    private fun updateHead() {
+        val days = Store.load(this, Settings.maybeIsOff(this))
+        val maybe = Store.loadMaybe(this)
+        val now = ZonedDateTime.now(Schedule.ZONE)
+        renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
+    }
+
     private fun renderContent() {
         val days = Store.load(this, Settings.maybeIsOff(this))
         val maybe = Store.loadMaybe(this)
         val now = ZonedDateTime.now(Schedule.ZONE)
+        shownSlot = slotKey(now)
         renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
 
         lists.removeAllViews()
