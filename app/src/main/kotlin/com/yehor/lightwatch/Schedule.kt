@@ -235,18 +235,6 @@ object Schedule {
 
     fun offDuration(flags: BooleanArray): Duration = Duration.ofMinutes(flags.count { it } * 30L)
 
-    /** "2г 17хв" / "34хв" / "3г" (h/min) */
-    fun fmt(d: Duration): String {
-        val m = d.toMinutes().coerceAtLeast(0)
-        val h = m / 60
-        val mm = m % 60
-        return when {
-            h > 0 && mm == 0L -> "${h}г"
-            h > 0 -> "${h}г ${mm}хв"
-            else -> "${mm}хв"
-        }
-    }
-
     /** Slot to "HH:MM" (48 → "24:00"). */
     fun slotTime(s: Int): String = "%02d:%02d".format(s / 2, (s % 2) * 30)
 }

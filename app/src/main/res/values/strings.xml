@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Svitlo</string>
+
+    <!-- Units and durations: "2h 17m" / "5h" / "34m" -->
+    <string name="unit_h">h</string>
+    <string name="unit_m">m</string>
+    <string name="duration_h">%1$dh</string>
+    <string name="duration_hm">%1$dh %2$dm</string>
+    <string name="duration_m">%1$dm</string>
+
+    <!-- Shared -->
+    <string name="queue_upper">QUEUE %1$s</string>
+    <string name="queue_name">Queue %1$s</string>
+    <string name="now">now</string>
+    <string name="strip_plus_12h">+12h</string>
+    <string name="no_data">No data</string>
+    <string name="no_data_upper">NO DATA</string>
+    <string name="state_switching_upper">SWITCHING</string>
+    <string name="state_off_upper">NO POWER</string>
+    <string name="state_on_upper">POWER IS ON</string>
+    <string name="until_no_change">no changes until %1$s</string>
+    <string name="power_on_at">power returns at %1$s</string>
+    <string name="power_off_at">power goes off at %1$s</string>
+    <string name="next_with_power">then %1$s with power</string>
+    <string name="next_without_power">then %1$s without power</string>
+    <string name="at_least" translatable="false">≥ %1$s</string>
+    <string name="minus" translatable="false">−%1$s</string>
+    <string name="time_range" translatable="false">%1$s – %2$s</string>
+    <string name="two_lines" translatable="false">%1$s\n%2$s</string>
+    <string name="three_lines" translatable="false">%1$s\n%2$s\n%3$s</string>
+
+    <!-- Tile -->
+    <string name="tile_update_failed">update failed</string>
+    <string name="tile_updating">updating…</string>
+    <string name="tile_tap_to_open">tap to open</string>
+    <string name="tile_data_from">⚠ data from %1$s</string>
+    <string name="tile_updated">updated %1$s</string>
+
+    <!-- Complication -->
+    <string name="complication_on" translatable="false">ON</string>
+    <string name="complication_off" translatable="false">OFF</string>
+    <string name="complication_title_prefix">"%1$s · in "</string>
+    <string name="complication_power_off">No power</string>
+    <string name="complication_power_on">Power is on</string>
+    <string name="complication_desc_no_change">%1$s, no changes until at least %2$s</string>
+    <string name="complication_desc_returns">%1$s, power returns at %2$s</string>
+    <string name="complication_desc_goes_off">%1$s, power goes off at %2$s</string>
+    <string name="complication_desc_stale">%1$s. Data is outdated</string>
+    <string name="complication_long_until">%1$s until %2$s+</string>
+    <string name="complication_long_power_from">Power from %1$s</string>
+    <string name="complication_long_off_at">Power off at %1$s</string>
+    <string name="complication_no_data_desc">No data about power</string>
+
+    <!-- App screen -->
+    <string name="refresh">Refresh</string>
+    <string name="refreshing">Refreshing…</string>
+    <string name="settings">Settings</string>
+    <string name="notifications">Notifications</string>
+    <string name="source">Source</string>
+    <string name="queue">Queue</string>
+    <string name="before_off">Before power-off</string>
+    <string name="before_on">Before power-on</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yellow_hint">yellow — switching, power may be off</string>
+    <string name="updated_at">Updated %1$s</string>
+    <string name="never_updated">Not updated yet</string>
+    <string name="warning_prefix" translatable="false">⚠ %1$s</string>
+    <string name="notifications_blocked">⚠ notifications are blocked</string>
+    <string name="yellow_is_off">Yellow = OFF\nin the countdown</string>
+    <string name="yellow_is_on">Yellow = ON\nin the countdown</string>
+    <string name="loading">loading…</string>
+    <string name="press_refresh">press “Refresh”</string>
+    <string name="no_outages">no outages</string>
+    <string name="no_schedule_yet">No schedule yet</string>
+    <string name="power_all_day">Power all day</string>
+
+    <!-- Notifications -->
+    <string name="lead_none">don\'t remind</string>
+    <string name="lead_minutes">%1$d min before</string>
+    <string name="channel_name">Power changes</string>
+    <string name="channel_description">Reminders before the power goes off and comes back</string>
+    <string name="notify_off_title">Power goes off at %1$s</string>
+    <string name="notify_on_title">Power comes back at %1$s</string>
+    <string name="notify_text_in">in %1$d min · queue %2$s</string>
+    <string name="notify_text_now">queue %1$s</string>
+
+    <!-- Fetch errors -->
+    <string name="err_no_connection">No connection</string>
+    <string name="err_blocked">The site blocked the request (HTTP %1$d)</string>
+    <string name="err_browser_check">The site requires a browser check</string>
+    <string name="err_schedule_not_found">Schedule for queue %1$s not found</string>
+</resources>

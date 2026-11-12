@@ -24,7 +24,8 @@ object Notify {
     private const val EXTRA_OFF = "off"
     private const val EXTRA_AT = "at"
 
-    fun leadLabel(m: Int) = if (m == 0) "не нагадувати" else "за $m хв"
+    fun leadLabel(c: Context, m: Int) =
+        if (m == 0) c.getString(R.string.lead_none) else c.getString(R.string.lead_minutes, m)
 
     /**
      * Next event under the current settings: (notification time, power going off?, change time).
@@ -92,8 +93,8 @@ object Notify {
         val nm = c.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) != null) return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Зміна світла", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Нагадування перед вимкненням і увімкненням"
+            NotificationChannel(CHANNEL, c.getString(R.string.channel_name), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = c.getString(R.string.channel_description)
                 enableVibration(true)
             }
         )
@@ -104,8 +105,10 @@ object Notify {
         val now = ZonedDateTime.now(Schedule.ZONE)
         val min = ((java.time.Duration.between(now, at).seconds + 59) / 60).coerceAtLeast(0)
         val hm = "%02d:%02d".format(at.hour, at.minute)
-        val title = if (off) "Світло вимкнуть о $hm" else "Світло увімкнуть о $hm"
-        val text = if (min > 0) "через $min хв · черга ${Settings.queue(c)}" else "черга ${Settings.queue(c)}"
+        val title = c.getString(if (off) R.string.notify_off_title else R.string.notify_on_title, hm)
+        val queue = Settings.queue(c)
+        val text = if (min > 0) c.getString(R.string.notify_text_in, min, queue)
+        else c.getString(R.string.notify_text_now, queue)
         val open = PendingIntent.getActivity(
             c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )

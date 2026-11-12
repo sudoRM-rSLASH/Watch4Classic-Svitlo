@@ -50,6 +50,9 @@ enum class Source(val host: String) {
     }
 }
 
+/** A fetch failure with a localized message: resolved with a Context where the error is stored. */
+class FetchError(@androidx.annotation.StringRes val res: Int, vararg val args: Any) : Exception()
+
 object Http {
     /** GET, or a form-urlencoded POST when [form] is given. */
     fun request(url: String, form: String? = null): String {
@@ -67,10 +70,10 @@ object Http {
                 conn.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
             }
             val code = conn.responseCode
-            if (code == 403 || code == 503) error("Сайт заблокував запит (HTTP $code)")
+            if (code == 403 || code == 503) throw FetchError(R.string.err_blocked, code)
             if (code != 200) error("HTTP $code")
             val html = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            if ("Just a moment" in html) error("Сайт вимагає перевірку браузера")
+            if ("Just a moment" in html) throw FetchError(R.string.err_browser_check)
             return html
         } finally {
             conn.disconnect()
@@ -160,7 +163,10 @@ object Store {
 object Fetcher {
     /** Blocking call; true on success. The error is written to Store.error. */
     fun refresh(c: Context): Boolean = try { fetch(c) } catch (e: java.io.IOException) {
-        Store.setError(c, "Немає з'єднання")
+        Store.setError(c, c.getString(R.string.err_no_connection))
+        false
+    } catch (e: FetchError) {
+        Store.setError(c, c.getString(e.res, *e.args))
         false
     } catch (e: Exception) {
         Store.setError(c, e.message ?: e.toString())
@@ -171,7 +177,7 @@ object Fetcher {
         val source = Settings.source(c)
         val queue = Settings.queue(c)
         val days = source.load(queue, LocalDate.now(Schedule.ZONE))
-        if (days.isEmpty()) error("Графік черги $queue не знайдено")
+        if (days.isEmpty()) throw FetchError(R.string.err_schedule_not_found, queue)
         // settings changed while the request was in flight: the result is stale
         if (source != Settings.source(c) || queue != Settings.queue(c)) return false
         Store.save(c, days)
