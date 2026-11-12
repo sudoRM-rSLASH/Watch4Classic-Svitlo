@@ -151,9 +151,9 @@ class LightTileService : TileService() {
             )
         }
         val labels = Row.Builder()
-            .addContent(text("зараз", 9f, LABEL))
+            .addContent(text(getString(R.string.now), 9f, LABEL))
             .addContent(Spacer.Builder().setWidth(dp(80f)).build())
-            .addContent(text("+12г", 9f, LABEL))
+            .addContent(text(getString(R.string.strip_plus_12h), 9f, LABEL))
         return Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .addContent(row.build())
@@ -171,19 +171,26 @@ class LightTileService : TileService() {
     ): LayoutElement {
         val col = Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(text("ЧЕРГА $queue", 12f, LABEL, bold = true))
+            .addContent(text(getString(R.string.queue_upper, queue), 12f, LABEL, bold = true))
             .addContent(gap(6f))
 
         if (st == null) {
-            col.addContent(text("НЕМАЄ ДАНИХ", 13f, GREY, bold = true))
+            col.addContent(text(getString(R.string.no_data_upper), 13f, GREY, bold = true))
                 .addContent(gap(4f))
-                .addContent(text(if (err != null) "не вдалось оновити" else "оновлюю…", 12f, LABEL))
+                .addContent(
+                    text(
+                        getString(if (err != null) R.string.tile_update_failed else R.string.tile_updating),
+                        12f, LABEL
+                    )
+                )
                 .addContent(gap(2f))
-                .addContent(text("торкнись, щоб відкрити", 11f, LABEL))
+                .addContent(text(getString(R.string.tile_tap_to_open), 11f, LABEL))
         } else {
             val switching = Schedule.at(maybe, now) == true
             val color = when { switching -> AMBER; st.off -> RED; else -> GREEN }
-            val title = when { switching -> "ПЕРЕМИКАННЯ"; st.off -> "СВІТЛА НЕМАЄ"; else -> "СВІТЛО Є" }
+            val title = getString(
+                when { switching -> R.string.state_switching_upper; st.off -> R.string.state_off_upper; else -> R.string.state_on_upper }
+            )
             col.addContent(text(title, 15f, color, bold = true))
                 .addContent(gap(2f))
                 .addContent(
@@ -192,18 +199,26 @@ class LightTileService : TileService() {
                 .addContent(gap(2f))
                 .addContent(
                     text(
-                        when {
-                            st.changeIsMinimum -> "без змін до ${hhmm(st.changeAt)}"
-                            st.off -> "увімкнуть о ${hhmm(st.changeAt)}"
-                            else -> "вимкнуть о ${hhmm(st.changeAt)}"
-                        },
+                        getString(
+                            when {
+                                st.changeIsMinimum -> R.string.until_no_change
+                                st.off -> R.string.power_on_at
+                                else -> R.string.power_off_at
+                            },
+                            hhmm(st.changeAt)
+                        ),
                         15f, GREY
                     )
                 )
             st.nextLen?.let {
-                val what = if (st.off) "зі світлом" else "без світла"
+                val len = (if (st.nextEndIsMinimum) "≥ " else "") + Fmt.duration(this, it)
                 col.addContent(gap(2f))
-                    .addContent(text("далі ${if (st.nextEndIsMinimum) "≥ " else ""}${Schedule.fmt(it)} $what", 13f, LABEL))
+                    .addContent(
+                        text(
+                            getString(if (st.off) R.string.next_with_power else R.string.next_without_power, len),
+                            13f, LABEL
+                        )
+                    )
             }
             col.addContent(gap(8f)).addContent(strip(days, now))
         }
@@ -212,8 +227,10 @@ class LightTileService : TileService() {
             val t = java.time.Instant.ofEpochMilli(fetched).atZone(Schedule.ZONE)
             col.addContent(gap(6f))
                 .addContent(
-                    if (err != null || stale) text("⚠ дані від ${if (t.toLocalDate() == now.toLocalDate()) hhmm(t) else t.format(DDHHMM)}", 12f, AMBER)
-                    else text("оновлено ${hhmm(t)}", 12f, LABEL)
+                    if (err != null || stale) {
+                        val from = if (t.toLocalDate() == now.toLocalDate()) hhmm(t) else t.format(DDHHMM)
+                        text(getString(R.string.tile_data_from, from), 12f, AMBER)
+                    } else text(getString(R.string.tile_updated, hhmm(t)), 12f, LABEL)
                 )
         }
         return Box.Builder()
@@ -225,7 +242,7 @@ class LightTileService : TileService() {
     }
 
     /**
-     * Large "2г 17хв" / "5г" / "34хв" countdown as dynamic text (minutes rounded up, +59 s).
+     * Large "2h 17m" / "5h" / "34m" countdown (localized units) as dynamic text (minutes rounded up, +59 s).
      * Older renderers without support show the static value as of the layout start.
      */
     private fun countdown(st: Schedule.Status, now: ZonedDateTime): LayoutElement {
@@ -235,20 +252,22 @@ class LightTileService : TileService() {
         val h = dur.toIntHours()
         val m = dur.minutesPart
         fun c(s: String) = DynamicString.constant(s)
+        val unitH = getString(R.string.unit_h)
+        val unitM = getString(R.string.unit_m)
         val dyn = c(pre).concat(
             DynamicString.onCondition(h.gt(0))
                 .use(
                     DynamicString.onCondition(m.eq(0))
-                        .use(h.format().concat(c("г")))
-                        .elseUse(h.format().concat(c("г ")).concat(m.format()).concat(c("хв")))
+                        .use(h.format().concat(c(unitH)))
+                        .elseUse(h.format().concat(c("$unitH ")).concat(m.format()).concat(c(unitM)))
                 )
-                .elseUse(m.format().concat(c("хв")))
+                .elseUse(m.format().concat(c(unitM)))
         )
-        val fallback = pre + Schedule.fmt(st.remaining(now).plusSeconds(59))
+        val fallback = pre + Fmt.duration(this, st.remaining(now).plusSeconds(59))
         return Text.Builder()
             .setText(TypeBuilders.StringProp.Builder(fallback).setDynamicValue(dyn).build())
             .setLayoutConstraintsForDynamicText(
-                TypeBuilders.StringLayoutConstraint.Builder("≥ 23г 59хв")
+                TypeBuilders.StringLayoutConstraint.Builder("≥ " + getString(R.string.duration_hm, 23, 59))
                     .setAlignment(LayoutElementBuilders.TEXT_ALIGN_CENTER)
                     .build()
             )

@@ -28,7 +28,7 @@ import kotlin.concurrent.thread
  * App screen (scrollable, including with the bezel):
  *  1) status and countdown,
  *  2) outages for today / tomorrow,
- *  3) last update time, "Оновити" (refresh) button,
+ *  3) last update time, "Refresh" button,
  *  4) settings: source, queue, yellow slots, notifications.
  */
 class MainActivity : Activity() {
@@ -69,7 +69,7 @@ class MainActivity : Activity() {
         }
         lists = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         footer = label(11f, Palette.LABEL).apply { gravity = Gravity.CENTER }
-        btn = pill("Оновити", Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
+        btn = pill(getString(R.string.refresh), Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
         sourceRow = settingRow { pickSource() }
         queueRow = settingRow { pickQueue() }
         notifyOffRow = settingRow { onLeadRow(off = true) }
@@ -111,7 +111,7 @@ class MainActivity : Activity() {
                 topMargin = dp(8f).toInt()
             })
             addView(label(13f, Palette.WHITE, bold = true).apply {
-                text = "Налаштування"
+                text = getString(R.string.settings)
                 setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
             })
             addView(sourceRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
@@ -122,7 +122,7 @@ class MainActivity : Activity() {
             })
             addView(maybeCard, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
             addView(label(13f, Palette.WHITE, bold = true).apply {
-                text = "Сповіщення"
+                text = getString(R.string.notifications)
                 setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
             })
             addView(notifyOffRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
@@ -156,13 +156,13 @@ class MainActivity : Activity() {
     private fun refreshNow() {
         if (busy) return
         busy = true
-        btn.text = "Оновлення…"
+        btn.text = getString(R.string.refreshing)
         btn.alpha = 0.6f
         thread {
             Fetcher.refreshAndNotify(applicationContext)
             runOnUiThread {
                 busy = false
-                btn.text = "Оновити"
+                btn.text = getString(R.string.refresh)
                 btn.alpha = 1f
                 render()
             }
@@ -172,7 +172,7 @@ class MainActivity : Activity() {
     private fun pickSource() {
         val all = Source.entries
         AlertDialog.Builder(this)
-            .setTitle("Джерело")
+            .setTitle(getString(R.string.source))
             .setSingleChoiceItems(all.map { it.host }.toTypedArray(), all.indexOf(Settings.source(this))) { d, i ->
                 d.dismiss()
                 applySettings { Settings.set(this, source = all[i]) }
@@ -191,8 +191,8 @@ class MainActivity : Activity() {
         val all = Notify.LEADS
         val cur = if (off) Settings.notifyOff(this) else Settings.notifyOn(this)
         AlertDialog.Builder(this)
-            .setTitle(if (off) "Перед вимкненням" else "Перед увімкненням")
-            .setSingleChoiceItems(all.map { Notify.leadLabel(it) }.toTypedArray(), all.indexOf(cur).coerceAtLeast(0)) { d, i ->
+            .setTitle(getString(if (off) R.string.before_off else R.string.before_on))
+            .setSingleChoiceItems(all.map { Notify.leadLabel(this, it) }.toTypedArray(), all.indexOf(cur).coerceAtLeast(0)) { d, i ->
                 d.dismiss()
                 if (off) Settings.setNotify(this, off = all[i]) else Settings.setNotify(this, on = all[i])
                 if (all[i] > 0) askNotificationPermission()
@@ -235,8 +235,8 @@ class MainActivity : Activity() {
     private fun pickQueue() {
         val all = Settings.QUEUES
         AlertDialog.Builder(this)
-            .setTitle("Черга")
-            .setSingleChoiceItems(all.map { "Черга $it" }.toTypedArray(), all.indexOf(Settings.queue(this))) { d, i ->
+            .setTitle(getString(R.string.queue))
+            .setSingleChoiceItems(all.map { getString(R.string.queue_name, it) }.toTypedArray(), all.indexOf(Settings.queue(this))) { d, i ->
                 d.dismiss()
                 applySettings { Settings.set(this, queue = all[i]) }
             }
@@ -271,11 +271,11 @@ class MainActivity : Activity() {
 
         lists.removeAllViews()
         val today = now.toLocalDate()
-        dayBlock("Сьогодні", days[today], maybe[today], Schedule.slotOf(now))
-        dayBlock("Завтра", days[today.plusDays(1)], maybe[today.plusDays(1)], -1)
+        dayBlock(getString(R.string.today), days[today], maybe[today], Schedule.slotOf(now))
+        dayBlock(getString(R.string.tomorrow), days[today.plusDays(1)], maybe[today.plusDays(1)], -1)
         if (maybe.values.any { m -> m.any { it } }) {
             lists.addView(label(11f, Palette.LABEL).apply {
-                text = "жовте — перемикання, світла може не бути"
+                text = getString(R.string.yellow_hint)
                 setPadding(0, dp(8f).toInt(), 0, 0)
             })
         }
@@ -284,29 +284,31 @@ class MainActivity : Activity() {
         val fetched = Store.fetchedAt(this)
         if (fetched > 0) {
             val t = Instant.ofEpochMilli(fetched).atZone(Schedule.ZONE)
-            sb.append("Оновлено ").append(t.format(if (t.toLocalDate() == today) HHMM else DDHHMM))
-        } else if (!busy) sb.append("Ще не оновлювалось")
+            sb.append(getString(R.string.updated_at, t.format(if (t.toLocalDate() == today) HHMM else DDHHMM)))
+        } else if (!busy) sb.append(getString(R.string.never_updated))
         val err = Store.error(this)
-        err?.let { sb.append("\n⚠ ").append(it) }
+        err?.let { sb.append("\n").append(getString(R.string.warning_prefix, it)) }
         val stale = Store.isStale(this)
         if (stale && err == null) sb.insert(0, "⚠ ")
         footer.text = sb
         footer.setTextColor(if (err != null || stale) Palette.AMBER else Palette.LABEL)
 
         val src = Settings.source(this)
-        sourceRow.text = "Джерело\n${src.host}"
-        queueRow.text = "Черга\n${Settings.queue(this)}"
+        sourceRow.text = getString(R.string.two_lines, getString(R.string.source), src.host)
+        queueRow.text = getString(R.string.two_lines, getString(R.string.queue), Settings.queue(this))
         val blocked = !Notify.enabled(this)
         for ((row, title, lead) in listOf(
-            Triple(notifyOffRow, "Перед вимкненням", Settings.notifyOff(this)),
-            Triple(notifyOnRow, "Перед увімкненням", Settings.notifyOn(this)),
+            Triple(notifyOffRow, getString(R.string.before_off), Settings.notifyOff(this)),
+            Triple(notifyOnRow, getString(R.string.before_on), Settings.notifyOn(this)),
         )) {
             val warn = blocked && lead > 0
-            row.text = "$title\n${Notify.leadLabel(lead)}" + if (warn) "\n⚠ сповіщення заборонені" else ""
+            val label = Notify.leadLabel(this, lead)
+            row.text = if (warn) getString(R.string.three_lines, title, label, getString(R.string.notifications_blocked))
+            else getString(R.string.two_lines, title, label)
             row.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
         }
         val maybeOff = Settings.maybeIsOff(this)
-        maybeRow.text = (if (maybeOff) "Жовте = OFF" else "Жовте = ON") + "\nу відліку"
+        maybeRow.text = getString(if (maybeOff) R.string.yellow_is_off else R.string.yellow_is_on)
         maybeSwitch.isChecked = maybeOff
     }
 
@@ -316,37 +318,43 @@ class MainActivity : Activity() {
             topMargin = dp(top).toInt()
         })
         add(label(11f, Palette.LABEL, bold = true).apply {
-            text = "ЧЕРГА ${Settings.queue(this@MainActivity)}"
+            text = getString(R.string.queue_upper, Settings.queue(this@MainActivity))
             letterSpacing = 0.1f
         })
         if (st == null) {
-            add(label(16f, Palette.GREY, bold = true).apply { text = "Немає даних" }, 18f)
+            add(label(16f, Palette.GREY, bold = true).apply { text = getString(R.string.no_data) }, 18f)
             add(label(12f, Palette.LABEL).apply {
-                text = if (busy) "завантажую…" else "натисни «Оновити»"
+                text = getString(if (busy) R.string.loading else R.string.press_refresh)
                 gravity = Gravity.CENTER
             }, 4f)
             return
         }
         val color = when { switching -> Palette.AMBER; st.off -> Palette.RED; else -> Palette.GREEN }
-        val title = when { switching -> "  ПЕРЕМИКАННЯ  "; st.off -> "  СВІТЛА НЕМАЄ  "; else -> "  СВІТЛО Є  " }
+        val title = getString(
+            when { switching -> R.string.state_switching_upper; st.off -> R.string.state_off_upper; else -> R.string.state_on_upper }
+        )
         add(pill(title, color, Palette.BG, 12f).apply {
             setPadding(dp(10f).toInt(), dp(4f).toInt(), dp(10f).toInt(), dp(4f).toInt())
         }, 10f)
         add(label(34f, Palette.WHITE, bold = true).apply {
-            text = (if (st.changeIsMinimum) "≥ " else "") + Schedule.fmt(st.remaining(now))
+            val left = Fmt.duration(this@MainActivity, st.remaining(now))
+            text = if (st.changeIsMinimum) getString(R.string.at_least, left) else left
         }, 4f)
         val at = hhmm(st.changeAt, now)
         add(label(14f, Palette.GREY).apply {
-            text = when {
-                st.changeIsMinimum -> "без змін до $at"
-                st.off -> "увімкнуть о $at"
-                else -> "вимкнуть о $at"
-            }
+            text = getString(
+                when {
+                    st.changeIsMinimum -> R.string.until_no_change
+                    st.off -> R.string.power_on_at
+                    else -> R.string.power_off_at
+                },
+                at
+            )
         })
         st.nextLen?.let {
-            val what = if (st.off) "зі світлом" else "без світла"
+            val len = (if (st.nextEndIsMinimum) "≥ " else "") + Fmt.duration(this, it)
             add(label(12f, Palette.LABEL).apply {
-                text = "далі ${if (st.nextEndIsMinimum) "≥ " else ""}${Schedule.fmt(it)} $what"
+                text = getString(if (st.off) R.string.next_with_power else R.string.next_without_power, len)
             }, 2f)
         }
     }
@@ -363,8 +371,8 @@ class MainActivity : Activity() {
         row.addView(label(12f, Palette.LABEL).apply {
             text = when {
                 flags == null -> ""
-                flags.none { it } -> "без відключень"
-                else -> "−${Schedule.fmt(Schedule.offDuration(flags))}"
+                flags.none { it } -> getString(R.string.no_outages)
+                else -> getString(R.string.minus, Fmt.duration(this@MainActivity, Schedule.offDuration(flags)))
             }
             if (flags != null && flags.any { it }) setTextColor(Palette.RED)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
@@ -374,14 +382,14 @@ class MainActivity : Activity() {
         lists.addView(row)
 
         if (flags == null) {
-            lists.addView(label(13f, Palette.LABEL).apply { text = "Графіка ще немає" })
+            lists.addView(label(13f, Palette.LABEL).apply { text = getString(R.string.no_schedule_yet) })
             return
         }
         lists.addView(StripView(this, flags, maybe, curSlot), LinearLayout.LayoutParams(MATCH_PARENT, dp(10f).toInt()).apply {
             bottomMargin = dp(6f).toInt()
         })
         val ranges = Schedule.offRanges(flags)
-        if (ranges.isEmpty()) lists.addView(label(13f, Palette.GREEN).apply { text = "Світло весь день" })
+        if (ranges.isEmpty()) lists.addView(label(13f, Palette.GREEN).apply { text = getString(R.string.power_all_day) })
         for ((a, b) in ranges) {
             val past = curSlot >= 0 && b <= curSlot
             val active = curSlot in a until b
@@ -396,10 +404,11 @@ class MainActivity : Activity() {
                     }
                 }, LinearLayout.LayoutParams(dp(8f).toInt(), dp(8f).toInt()).apply { rightMargin = dp(8f).toInt() })
                 addView(label(14f, if (past) Palette.LABEL else Palette.GREY, bold = active).apply {
-                    text = "${Schedule.slotTime(a)} – ${Schedule.slotTime(b)}"
+                    text = getString(R.string.time_range, Schedule.slotTime(a), Schedule.slotTime(b))
                 }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
                 addView(label(12f, if (active) Palette.RED else Palette.LABEL).apply {
-                    text = if (active) "зараз" else Schedule.fmt(java.time.Duration.ofMinutes((b - a) * 30L))
+                    text = if (active) getString(R.string.now)
+                    else Fmt.duration(this@MainActivity, java.time.Duration.ofMinutes((b - a) * 30L))
                 })
             })
         }

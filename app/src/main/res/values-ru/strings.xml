@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Свет</string>
+
+    <string name="unit_h">ч</string>
+    <string name="unit_m">мин</string>
+    <string name="duration_h">%1$dч</string>
+    <string name="duration_hm">%1$dч %2$dмин</string>
+    <string name="duration_m">%1$dмин</string>
+
+    <string name="queue_upper">ОЧЕРЕДЬ %1$s</string>
+    <string name="queue_name">Очередь %1$s</string>
+    <string name="now">сейчас</string>
+    <string name="strip_plus_12h">+12ч</string>
+    <string name="no_data">Нет данных</string>
+    <string name="no_data_upper">НЕТ ДАННЫХ</string>
+    <string name="state_switching_upper">ПЕРЕКЛЮЧЕНИЕ</string>
+    <string name="state_off_upper">СВЕТА НЕТ</string>
+    <string name="state_on_upper">СВЕТ ЕСТЬ</string>
+    <string name="until_no_change">без изменений до %1$s</string>
+    <string name="power_on_at">включат в %1$s</string>
+    <string name="power_off_at">отключат в %1$s</string>
+    <string name="next_with_power">дальше %1$s со светом</string>
+    <string name="next_without_power">дальше %1$s без света</string>
+
+    <string name="tile_update_failed">не удалось обновить</string>
+    <string name="tile_updating">обновляю…</string>
+    <string name="tile_tap_to_open">нажми, чтобы открыть</string>
+    <string name="tile_data_from">⚠ данные от %1$s</string>
+    <string name="tile_updated">обновлено %1$s</string>
+
+    <string name="complication_title_prefix">"%1$s · ещё "</string>
+    <string name="complication_power_off">Света нет</string>
+    <string name="complication_power_on">Свет есть</string>
+    <string name="complication_desc_no_change">%1$s, без изменений как минимум до %2$s</string>
+    <string name="complication_desc_returns">%1$s, включат в %2$s</string>
+    <string name="complication_desc_goes_off">%1$s, отключат в %2$s</string>
+    <string name="complication_desc_stale">%1$s. Данные устарели</string>
+    <string name="complication_long_until">%1$s до %2$s+</string>
+    <string name="complication_long_power_from">Свет с %1$s</string>
+    <string name="complication_long_off_at">Отключат в %1$s</string>
+    <string name="complication_no_data_desc">Нет данных о свете</string>
+
+    <string name="refresh">Обновить</string>
+    <string name="refreshing">Обновление…</string>
+    <string name="settings">Настройки</string>
+    <string name="notifications">Уведомления</string>
+    <string name="source">Источник</string>
+    <string name="queue">Очередь</string>
+    <string name="before_off">Перед отключением</string>
+    <string name="before_on">Перед включением</string>
+    <string name="today">Сегодня</string>
+    <string name="tomorrow">Завтра</string>
+    <string name="yellow_hint">жёлтое — переключение, света может не быть</string>
+    <string name="updated_at">Обновлено %1$s</string>
+    <string name="never_updated">Ещё не обновлялось</string>
+    <string name="notifications_blocked">⚠ уведомления запрещены</string>
+    <string name="yellow_is_off">Жёлтое = OFF\nв отсчёте</string>
+    <string name="yellow_is_on">Жёлтое = ON\nв отсчёте</string>
+    <string name="loading">загружаю…</string>
+    <string name="press_refresh">нажми «Обновить»</string>
+    <string name="no_outages">без отключений</string>
+    <string name="no_schedule_yet">Графика ещё нет</string>
+    <string name="power_all_day">Свет весь день</string>
+
+    <string name="lead_none">не напоминать</string>
+    <string name="lead_minutes">за %1$d мин</string>
+    <string name="channel_name">Изменение света</string>
+    <string name="channel_description">Напоминания перед отключением и включением</string>
+    <string name="notify_off_title">Свет отключат в %1$s</string>
+    <string name="notify_on_title">Свет включат в %1$s</string>
+    <string name="notify_text_in">через %1$d мин · очередь %2$s</string>
+    <string name="notify_text_now">очередь %1$s</string>
+
+    <string name="err_no_connection">Нет соединения</string>
+    <string name="err_blocked">Сайт заблокировал запрос (HTTP %1$d)</string>
+    <string name="err_browser_check">Сайт требует проверку браузера</string>
+    <string name="err_schedule_not_found">График очереди %1$s не найден</string>
+</resources>

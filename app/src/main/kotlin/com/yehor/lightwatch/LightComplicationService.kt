@@ -32,8 +32,8 @@ import java.time.temporal.ChronoUnit
 
 /**
  * Watch face complication.
- *  SHORT_TEXT  : icon (⚡ / struck-through ⚡) + countdown + "→вимк"/"→увімк"
- *  LONG_TEXT   : "Світло є · вимк о 14:00" + countdown
+ *  SHORT_TEXT  : icon (⚡ / struck-through ⚡) + state ON/OFF + countdown
+ *  LONG_TEXT   : "Power off at 14:00" + title "ON · in 5:54"
  *  RANGED_VALUE: arc = elapsed part of the current phase, countdown in the centre
  * The watch face runs the countdown itself; the timeline switches state exactly at the change.
  */
@@ -70,7 +70,7 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
      *   title: current state "ON"/"OFF" (~5 chars fit), text: time left "5:54" / "0:37"
      *   (dynamic text: the watch recomputes it every minute; without support, a static "5:54" as of the request),
      *   icon: a bolt (struck through when the power is off), arc: elapsed part of the phase.
-     * LONG_TEXT: title "OFF · ще 5:54", text "Світло з 01:00" / "Вимкнуть о 14:00".
+     * LONG_TEXT: title "OFF · in 5:54", text "Power from 01:00" / "Power off at 14:00" (localized).
      */
     private fun build(type: ComplicationType, st: Schedule.Status?, now: ZonedDateTime): ComplicationData? {
         if (st == null) return noData(type)
@@ -78,18 +78,23 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
         val prefix = if (st.changeIsMinimum) ">" else ""
         fun countdown(before: String = ""): ComplicationText = hmCountdown(st.changeAt, now, before + prefix)
 
-        val stateEn = (if (st.off) "OFF" else "ON") + if (stale) "?" else ""
+        val stateTag = getString(if (st.off) R.string.complication_off else R.string.complication_on) +
+            if (stale) "?" else ""
         val at = hhmm(st.changeAt, now)
-        val stateUa = if (st.off) "Немає світла" else "Світло є"
-        val desc = text(
-            (if (st.changeIsMinimum) "$stateUa, без змін щонайменше до $at"
-            else "$stateUa, ${if (st.off) "увімкнуть" else "вимкнуть"} о $at") +
-                if (stale) ". Дані застарілі" else ""
+        val stateName = getString(if (st.off) R.string.complication_power_off else R.string.complication_power_on)
+        val descText = getString(
+            when {
+                st.changeIsMinimum -> R.string.complication_desc_no_change
+                st.off -> R.string.complication_desc_returns
+                else -> R.string.complication_desc_goes_off
+            },
+            stateName, at
         )
+        val desc = text(if (stale) getString(R.string.complication_desc_stale, descText) else descText)
         val img = icon(st.off)
 
         // small format
-        val shortTitle: ComplicationText = text(stateEn)
+        val shortTitle: ComplicationText = text(stateTag)
         val shortText: ComplicationText =
             countdown()
 
@@ -110,14 +115,14 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
             ComplicationType.LONG_TEXT -> LongTextComplicationData.Builder(
                 text(
                     when {
-                        st.changeIsMinimum -> "$stateUa до $at+"
-                        st.off -> "Світло з $at"
-                        else -> "Вимкнуть о $at"
+                        st.changeIsMinimum -> getString(R.string.complication_long_until, stateName, at)
+                        st.off -> getString(R.string.complication_long_power_from, at)
+                        else -> getString(R.string.complication_long_off_at, at)
                     }
                 ),
                 desc
             )
-                .setTitle(countdown("$stateEn · ще "))
+                .setTitle(countdown(getString(R.string.complication_title_prefix, stateTag)))
                 .setMonochromaticImage(img)
                 .setTapAction(tap())
                 .build()
@@ -148,11 +153,11 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
 
     private fun noData(type: ComplicationType): ComplicationData? {
         val dash = text("—")
-        val desc = text("Немає даних про світло")
+        val desc = text(getString(R.string.complication_no_data_desc))
         return when (type) {
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(dash, desc)
                 .setMonochromaticImage(icon(false)).setTapAction(tap()).build()
-            ComplicationType.LONG_TEXT -> LongTextComplicationData.Builder(text("Немає даних"), desc)
+            ComplicationType.LONG_TEXT -> LongTextComplicationData.Builder(text(getString(R.string.no_data)), desc)
                 .setMonochromaticImage(icon(false)).setTapAction(tap()).build()
             ComplicationType.RANGED_VALUE -> RangedValueComplicationData.Builder(0f, 0f, 100f, desc)
                 .setText(dash).setMonochromaticImage(icon(false)).setTapAction(tap()).build()
