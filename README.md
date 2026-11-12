@@ -54,7 +54,7 @@ adb install -r release/svitlo.apk
 
 ## Збірка
 
-JDK 17, Android SDK 35:
+Android SDK 35 (platform `android-35`). Gradle запускається на JDK 21: версія записана в `gradle/gradle-daemon-jvm.properties`, і Gradle сам завантажує її при першій збірці:
 ```bash
 ./gradlew :app:assembleRelease
 # → app/build/outputs/apk/release/app-release.apk
