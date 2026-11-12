@@ -65,28 +65,50 @@ object Notify {
     fun stillValid(days: Map<java.time.LocalDate, BooleanArray>, at: ZonedDateTime, off: Boolean): Boolean =
         Schedule.at(days, at) == off && Schedule.at(days, at.minusMinutes(30)) != off
 
+    /** Parameters of the alarm that is currently set, to skip a pointless cancel + set with the same values. */
+    private const val KEY_SCHEDULED = "scheduled"
+
+    private fun alarmIntent(c: Context) = Intent(c, AlarmReceiver::class.java)
+
     fun schedule(c: Context) {
         val am = c.getSystemService(AlarmManager::class.java)
-        val pi = PendingIntent.getBroadcast(
-            c, 0, Intent(c, AlarmReceiver::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        am.cancel(pi)
         val ev = next(
             Store.load(c, Settings.maybeIsOff(c)), ZonedDateTime.now(Schedule.ZONE),
             Settings.notifyOff(c), Settings.notifyOn(c), shownAt(c)
-        ) ?: return
-        val (fire, off, at) = ev
-        val intent = Intent(c, AlarmReceiver::class.java)
-            .putExtra(EXTRA_OFF, off).putExtra(EXTRA_AT, at.toInstant().toEpochMilli())
-        val p = PendingIntent.getBroadcast(
-            c, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        if (ev == null) {
+            cancel(c, am)
+            return
+        }
+        val (fire, off, at) = ev
         val ms = fire.toInstant().toEpochMilli()
-        if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms())
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ms, p)
-        else
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ms, p)
+        val atMs = at.toInstant().toEpochMilli()
+        val exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
+        val key = "$ms|$off|$atMs|$exact"
+        // This runs after every refresh, settings change and alarm. If the very same alarm is still pending in
+        // the future, there is nothing to do. (After a reboot or an app update the PendingIntent is gone too.)
+        val pending = PendingIntent.getBroadcast(
+            c, 0, alarmIntent(c), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+        ) != null
+        if (pending && ms > System.currentTimeMillis() && prefs(c).getString(KEY_SCHEDULED, null) == key) return
+
+        val p = PendingIntent.getBroadcast(
+            c, 0, alarmIntent(c).putExtra(EXTRA_OFF, off).putExtra(EXTRA_AT, atMs),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        am.cancel(p)
+        if (exact) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ms, p)
+        else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, ms, p)
+        prefs(c).edit().putString(KEY_SCHEDULED, key).apply()
+    }
+
+    private fun cancel(c: Context, am: AlarmManager) {
+        am.cancel(
+            PendingIntent.getBroadcast(
+                c, 0, alarmIntent(c), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        )
+        prefs(c).edit().remove(KEY_SCHEDULED).apply()
     }
 
     fun channel(c: Context) {
