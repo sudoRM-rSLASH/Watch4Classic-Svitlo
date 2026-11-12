@@ -23,13 +23,21 @@ enum class Source(val host: String) {
     BEZSVITLA("bezsvitla.com.ua"),
     ENERGY_UA("energy-ua.info");
 
-    fun load(queue: String, today: LocalDate): Map<LocalDate, IntArray> = when (this) {
+    /**
+     * Dates a [load] call asks the source about. A date that is requested but missing from the result
+     * has no (or no longer has a) published schedule. [hour] is the current hour in [Schedule.ZONE].
+     */
+    fun requested(today: LocalDate, hour: Int): List<LocalDate> =
+        // POE publishes tomorrow's schedule in the evening, so it is not requested before noon
+        if (this == POE && hour < 12) listOf(today) else listOf(today, today.plusDays(1))
+
+    fun load(
+        queue: String, today: LocalDate, hour: Int = java.time.LocalTime.now(Schedule.ZONE).hour,
+    ): Map<LocalDate, IntArray> = when (this) {
         POE -> {
             // newgpv-info.php returns an HTML table of all queues for the date; empty means not published yet
             val out = LinkedHashMap<LocalDate, IntArray>()
-            // POE publishes tomorrow's schedule in the evening, so skip that request before noon
-            val noon = java.time.LocalTime.now(Schedule.ZONE).hour >= 12
-            for (d in if (noon) listOf(today, today.plusDays(1)) else listOf(today)) {
+            for (d in requested(today, hour)) {
                 val body = "seldate=" + java.net.URLEncoder.encode(
                     """{"date_in":"${d.format(POE_DATE)}"}""", "UTF-8"
                 )
@@ -113,10 +121,20 @@ object Settings {
 object Store {
     private fun p(c: Context) = c.getSharedPreferences("sched", Context.MODE_PRIVATE)
 
-    /** Merges new days into the old ones (new ones win) and drops days older than yesterday. */
-    fun save(c: Context, fresh: Map<LocalDate, IntArray>) {
+    /**
+     * Merges new days into the old ones (new ones win), drops days older than yesterday
+     * and the days in [missing]: the source no longer publishes them, so the cached copy is stale.
+     */
+    fun merge(
+        old: Map<LocalDate, IntArray>, fresh: Map<LocalDate, IntArray>, today: LocalDate,
+        missing: Collection<LocalDate> = emptyList(),
+    ): java.util.SortedMap<LocalDate, IntArray> =
+        (old.filterKeys { it !in missing } + fresh)
+            .filterKeys { !it.isBefore(today.minusDays(1)) }.toSortedMap()
+
+    fun save(c: Context, fresh: Map<LocalDate, IntArray>, missing: Collection<LocalDate> = emptyList()) {
         val today = LocalDate.now(Schedule.ZONE)
-        val merged = (raw(c) + fresh).filterKeys { !it.isBefore(today.minusDays(1)) }.toSortedMap()
+        val merged = merge(raw(c), fresh, today, missing)
         val s = merged.entries.joinToString(";") { (d, f) -> "$d=" + f.joinToString("") }
         p(c).edit().putString("days", s).putLong("fetched", System.currentTimeMillis())
             .remove("error").apply()
@@ -170,11 +188,16 @@ object Fetcher {
     private fun fetch(c: Context): Boolean {
         val source = Settings.source(c)
         val queue = Settings.queue(c)
-        val days = source.load(queue, LocalDate.now(Schedule.ZONE))
+        val today = LocalDate.now(Schedule.ZONE)
+        val hour = java.time.LocalTime.now(Schedule.ZONE).hour
+        val days = source.load(queue, today, hour)
         if (days.isEmpty()) error("Графік черги $queue не знайдено")
         // settings changed while the request was in flight: the result is stale
         if (source != Settings.source(c) || queue != Settings.queue(c)) return false
-        Store.save(c, days)
+        // Tomorrow was asked for but is gone (the source withdrew it): don't keep showing the old copy.
+        // Today is kept: a missing today is more likely a glitch of the site than a real change.
+        val missing = source.requested(today, hour).filter { it.isAfter(today) && it !in days }
+        Store.save(c, days, missing)
         return true
     }
 
