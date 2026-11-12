@@ -269,15 +269,23 @@ object Refresh {
      * with other network jobs.
      */
     fun ensure(c: Context) {
-        val wm = WorkManager.getInstance(c)
-        wm.cancelUniqueWork("periodic") // old 30-minute job
-        wm.cancelUniqueWork("periodic15") // old 15-minute job
-        wm.enqueueUniquePeriodicWork(
-            "periodic30", ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<RefreshWorker>(30, TimeUnit.MINUTES, 10, TimeUnit.MINUTES)
-                .setConstraints(netBatteryOk).build()
-        )
+        // the tile, the complication and the app call this on every request: do the work once per process
+        if (ensured) return
+        synchronized(this) {
+            if (ensured) return
+            val wm = WorkManager.getInstance(c.applicationContext)
+            wm.cancelUniqueWork("periodic") // old 30-minute job
+            wm.cancelUniqueWork("periodic15") // old 15-minute job
+            wm.enqueueUniquePeriodicWork(
+                "periodic30", ExistingPeriodicWorkPolicy.KEEP,
+                PeriodicWorkRequestBuilder<RefreshWorker>(30, TimeUnit.MINUTES, 10, TimeUnit.MINUTES)
+                    .setConstraints(netBatteryOk).build()
+            )
+            ensured = true
+        }
     }
+
+    @Volatile private var ensured = false
 
     /** One-off refresh now. */
     fun now(c: Context) {
