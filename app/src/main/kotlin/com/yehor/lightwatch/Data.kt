@@ -227,7 +227,7 @@ object Fetcher {
     /**
      * Refresh the cache and redraw the tile + complication, but only if the schedule or the error changed.
      * POE usually returns the same schedule, and there is no need to wake the watch face for nothing
-     * (the tile's "updated HH:MM" catches up on its regular 15-minute refresh).
+     * (the tile's "updated HH:MM" catches up on its regular hourly rebuild).
      */
     fun refreshAndNotify(c: Context): Boolean {
         val before = Store.snapshot(c)

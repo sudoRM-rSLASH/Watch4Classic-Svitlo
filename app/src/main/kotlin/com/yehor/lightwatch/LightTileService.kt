@@ -75,7 +75,7 @@ class LightTileService : TileService() {
         return Futures.immediateFuture(
             TileBuilders.Tile.Builder()
                 .setResourcesVersion(RES_VERSION)
-                .setFreshnessIntervalMillis(15 * 60_000L)
+                .setFreshnessIntervalMillis(FRESHNESS_MS)
                 .setTileTimeline(timeline.build())
                 .build()
         )
@@ -304,8 +304,13 @@ class LightTileService : TileService() {
     private companion object {
         const val RES_VERSION = "3"
         const val STRIP_SLOTS = 24
-        /** Half-hour layouts ahead (~3 h); the tile is re-requested every 15 min anyway. */
-        const val TIMELINE_SLOTS = 6
+        /**
+         * Half-hour layouts ahead (~6 h). A layout per slot is needed because the strip shifts every 30 min,
+         * so a longer timeline means fewer tile rebuilds; real changes of the data call requestUpdate().
+         */
+        const val TIMELINE_SLOTS = 12
+        /** The system re-requests the tile at most this often (it only has to outlive the data refresh job). */
+        const val FRESHNESS_MS = 60 * 60_000L
         val DDHHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
         val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
