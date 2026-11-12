@@ -256,7 +256,12 @@ object Refresh {
     /** The background job also waits for a battery that is not low: refreshes can wait, the watch cannot. */
     private val netBatteryOk = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
-    private const val STALE_MS = 15 * 60_000L
+    /**
+     * The tile, the complication and the app trigger an extra refresh when the data is older than this.
+     * It is longer than the periodic job interval (30 min + flex), so that they only step in if that job
+     * is stuck, and do not add their own network wake-ups on top of it.
+     */
+    private const val STALE_MS = 45 * 60_000L
 
     /**
      * Periodic refresh every 30 min. The countdown is computed by the watch itself, so the data only has to be
