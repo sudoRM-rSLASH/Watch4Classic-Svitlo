@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
+import android.os.Build
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationText
 import androidx.wear.watchface.complications.data.ComplicationType
@@ -130,6 +131,11 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
      * 30 s before the change it shows "0:01", not "0:00".
      */
     private fun hmCountdown(target: ZonedDateTime, now: ZonedDateTime, prefix: String): ComplicationText {
+        val m = (java.time.Duration.between(now, target).seconds + 59).coerceAtLeast(0) / 60
+        val fallback = "$prefix${m / 60}:%02d".format(m % 60)
+        // dynamic text needs API 33+; older systems get the static value (refreshed by the timeline and update period)
+        if (Build.VERSION.SDK_INT < 33) return text(fallback)
+
         val dur = DynamicInstant.platformTimeWithSecondsPrecision()
             .durationUntil(DynamicInstant.withSecondsPrecision(target.toInstant().plusSeconds(59)))
         val twoDigits = DynamicInt32.IntFormatter.Builder().setMinIntegerDigits(2).build()
@@ -137,8 +143,6 @@ class LightComplicationService : SuspendingTimelineComplicationDataSourceService
             .concat(dur.toIntHours().format())
             .concat(DynamicString.constant(":"))
             .concat(dur.minutesPart.format(twoDigits))
-        val m = (java.time.Duration.between(now, target).seconds + 59).coerceAtLeast(0) / 60
-        val fallback = "$prefix${m / 60}:%02d".format(m % 60)
         return DynamicComplicationText(dyn, fallback)
     }
 
