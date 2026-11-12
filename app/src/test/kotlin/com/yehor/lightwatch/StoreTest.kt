@@ -35,6 +35,18 @@ class StoreTest {
         assertTrue(tomorrow in merged)
     }
 
+    @Test fun parseDays_readsValidDaysAndSkipsBrokenOnes() {
+        val ok = "0".repeat(24) + "1".repeat(23) + "2" // 48 slots
+        val days = Store.parseDays("2026-11-10=$ok;2026-11-11=short;not-a-date=$ok;2026-11-12=${ok.dropLast(1)}x")
+        // a non-digit slot is read as "power on", the other three entries are dropped
+        assertEquals(setOf(today, today.plusDays(2)), days.keys)
+        assertEquals(2, days.getValue(today)[47])
+        assertEquals(1, days.getValue(today)[24])
+        assertEquals(0, days.getValue(today.plusDays(2))[47])
+    }
+
+    @Test fun parseDays_emptyString() = assertTrue(Store.parseDays("").isEmpty())
+
     @Test fun requested_poeSkipsTomorrowBeforeNoon() {
         assertEquals(listOf(today), Source.POE.requested(today, hour = 11))
         assertEquals(listOf(today, tomorrow), Source.POE.requested(today, hour = 12))

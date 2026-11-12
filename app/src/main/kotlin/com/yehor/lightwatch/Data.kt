@@ -146,15 +146,22 @@ object Store {
             .remove("error").apply()
     }
 
-    /** Slot states 0/1/2 per day. */
+    /** The last parsed cache string and its result: the tile, the complication and the app read it all the time. */
+    @Volatile private var parsed: Pair<String, Map<LocalDate, IntArray>>? = null
+
+    /** Parses "2026-11-08=0000111...;2026-11-09=..."; broken entries (bad date, wrong length) are skipped. */
+    fun parseDays(s: String): Map<LocalDate, IntArray> = s.split(";").mapNotNull {
+        val parts = it.split("=")
+        if (parts.size != 2 || parts[1].length != Schedule.SLOTS) return@mapNotNull null
+        runCatching { LocalDate.parse(parts[0]) }.getOrNull()
+            ?.let { d -> d to IntArray(Schedule.SLOTS) { i -> parts[1][i].digitToIntOrNull() ?: 0 } }
+    }.toMap()
+
+    /** Slot states 0/1/2 per day. The result is shared between callers: it must not be modified. */
     fun raw(c: Context): Map<LocalDate, IntArray> {
         val s = p(c).getString("days", null) ?: return emptyMap()
-        return s.split(";").mapNotNull {
-            val parts = it.split("=")
-            if (parts.size != 2 || parts[1].length != Schedule.SLOTS) return@mapNotNull null
-            runCatching { LocalDate.parse(parts[0]) }.getOrNull()
-                ?.let { d -> d to IntArray(Schedule.SLOTS) { i -> parts[1][i].digitToIntOrNull() ?: 0 } }
-        }.toMap()
+        parsed?.let { if (it.first == s) return it.second }
+        return parseDays(s).also { parsed = s to it }
     }
 
     /** true: no power (including "may be off" while switching). */
