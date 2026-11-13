@@ -230,22 +230,28 @@ object Fetcher {
 
     private const val TOMORROW_RECHECK_MS = 60 * 60_000L
 
-    /** Refresh the cache and redraw the tile + complication. */
     /**
-     * Refresh the cache and redraw the tile + complication, but only if the schedule or the error changed.
-     * POE usually returns the same schedule, and there is no need to wake the watch face for nothing
-     * (the tile's "updated HH:MM" catches up on its regular hourly rebuild).
+     * Refresh the cache and redraw what shows it. The tile and the complication are redrawn if the schedule or
+     * the error changed (POE usually returns the same schedule, no need to wake the watch face for nothing).
+     * If only the fetch time changed, just the tile is redrawn: it is the only place that shows the time
+     * ("updated HH:MM") and it would otherwise disagree with the app until its next hourly rebuild.
      */
     fun refreshAndNotify(c: Context): Boolean {
         val before = Store.snapshot(c)
+        val fetchedBefore = Store.fetchedAt(c)
         val ok = refresh(c)
         if (Store.snapshot(c) != before) notifyAll(c)
+        else if (Store.fetchedAt(c) != fetchedBefore) requestTileUpdate(c)
         Notify.schedule(c)
         return ok
     }
 
-    fun notifyAll(c: Context) {
+    private fun requestTileUpdate(c: Context) {
         TileService.getUpdater(c).requestUpdate(LightTileService::class.java)
+    }
+
+    fun notifyAll(c: Context) {
+        requestTileUpdate(c)
         LightComplicationService.requestUpdate(c)
         Notify.schedule(c)
     }
