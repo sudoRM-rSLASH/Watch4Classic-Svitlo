@@ -76,4 +76,15 @@
     <string name="err_blocked">Сайт заблокировал запрос (HTTP %1$d)</string>
     <string name="err_browser_check">Сайт требует проверку браузера</string>
     <string name="err_schedule_not_found">График очереди %1$s не найден</string>
+
+    <string name="notify_setting_today">График на сегодня изменился</string>
+    <string name="notify_setting_tomorrow">Появился график на завтра</string>
+    <string name="channel_schedule_name">Обновления графика</string>
+    <string name="channel_schedule_description">Когда меняется график на сегодня или появляется график на завтра</string>
+    <string name="notify_today_title">График на сегодня изменился</string>
+    <string name="notify_tomorrow_title">Появился график на завтра</string>
+    <string name="notify_added">Добавлено: %1$s</string>
+    <string name="notify_removed">Убрано: %1$s</string>
+    <string name="notify_tomorrow_outages">Отключения: %1$s · всего %2$s</string>
+    <string name="notify_tomorrow_none">Завтра без отключений</string>
 </resources>

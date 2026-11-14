@@ -91,4 +91,16 @@
     <string name="err_blocked">The site blocked the request (HTTP %1$d)</string>
     <string name="err_browser_check">The site requires a browser check</string>
     <string name="err_schedule_not_found">Schedule for queue %1$s not found</string>
+
+    <!-- Schedule change notifications -->
+    <string name="notify_setting_today">Today\'s schedule changed</string>
+    <string name="notify_setting_tomorrow">Tomorrow\'s schedule appeared</string>
+    <string name="channel_schedule_name">Schedule updates</string>
+    <string name="channel_schedule_description">When today\'s schedule changes or tomorrow\'s schedule appears</string>
+    <string name="notify_today_title">Today\'s schedule changed</string>
+    <string name="notify_tomorrow_title">Tomorrow\'s schedule appeared</string>
+    <string name="notify_added">Added: %1$s</string>
+    <string name="notify_removed">Removed: %1$s</string>
+    <string name="notify_tomorrow_outages">Outages: %1$s · %2$s total</string>
+    <string name="notify_tomorrow_none">No outages tomorrow</string>
 </resources>

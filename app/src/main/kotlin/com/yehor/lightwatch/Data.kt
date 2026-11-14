@@ -116,6 +116,14 @@ object Settings {
         p(c).edit().putInt("notifyOff", off).putInt("notifyOn", on).apply()
     }
 
+    /** Notify when the schedule for today changed. Off by default. */
+    fun notifyTodayChanged(c: Context): Boolean = p(c).getBoolean("notifyTodayChanged", false)
+    fun setNotifyTodayChanged(c: Context, v: Boolean) { p(c).edit().putBoolean("notifyTodayChanged", v).apply() }
+
+    /** Notify when the schedule for tomorrow appeared. Off by default. */
+    fun notifyTomorrowNew(c: Context): Boolean = p(c).getBoolean("notifyTomorrowNew", false)
+    fun setNotifyTomorrowNew(c: Context, v: Boolean) { p(c).edit().putBoolean("notifyTomorrowNew", v).apply() }
+
     /** Changing the source/queue clears the cache: the old schedule no longer applies. */
     fun set(c: Context, source: Source = source(c), queue: String = queue(c)) {
         if (source == source(c) && queue == queue(c)) return
@@ -232,8 +240,10 @@ object Fetcher {
         // Today is kept: a missing today is more likely a glitch of the site than a real change.
         val asked = source.requested(today, hour, withTomorrow)
         val missing = asked.filter { it.isAfter(today) && it !in days }
+        val before = Store.raw(c)
         Store.save(c, days, missing)
         if (tomorrow in asked) Store.markTomorrowChecked(c, now)
+        Notify.onScheduleSaved(c, before, Store.raw(c))
         return true
     }
 
