@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var yellow: SwitchRow
     private lateinit var notifyToday: SwitchRow
     private lateinit var notifyTomorrow: SwitchRow
+    private lateinit var quietRow: TextView
     private lateinit var notifyOffRow: TextView
     private lateinit var notifyOnRow: TextView
     private val ui = Handler(Looper.getMainLooper())
@@ -100,6 +101,8 @@ class MainActivity : Activity() {
             render()
         }
 
+        quietRow = settingRow { pickQuiet() }
+
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(side, (w * 0.12f).toInt(), side, (w * 0.22f).toInt())
@@ -135,7 +138,10 @@ class MainActivity : Activity() {
             addView(notifyToday.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
                 bottomMargin = dp(6f).toInt()
             })
-            addView(notifyTomorrow.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(notifyTomorrow.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                bottomMargin = dp(6f).toInt()
+            })
+            addView(quietRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         scroll = ScrollView(this).apply {
             isFocusable = true
@@ -251,6 +257,48 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** Quiet hours: off, a ready-made window, or "Custom…" (the start hour, then the end hour). */
+    private fun pickQuiet() {
+        val from = Settings.quietFrom(this)
+        val to = Settings.quietTo(this)
+        val presets = QuietHours.PRESETS
+        val items = listOf(getString(R.string.quiet_off)) +
+            presets.map { (f, t) -> getString(R.string.time_range, hourLabel(f), hourLabel(t)) } +
+            getString(R.string.quiet_custom)
+        val current = when {
+            !QuietHours.enabled(from, to) -> 0
+            else -> presets.indexOf(from to to).let { if (it >= 0) it + 1 else items.lastIndex }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.quiet_hours))
+            .setSingleChoiceItems(items.toTypedArray(), current) { d, i ->
+                d.dismiss()
+                when (i) {
+                    0 -> setQuiet(0, 0)
+                    items.lastIndex -> pickHour(R.string.quiet_from, from) { f ->
+                        pickHour(R.string.quiet_to, to) { t -> setQuiet(f, t) }
+                    }
+                    else -> presets[i - 1].let { (f, t) -> setQuiet(f, t) }
+                }
+            }
+            .show()
+    }
+
+    private fun setQuiet(from: Int, to: Int) {
+        Settings.setQuiet(this, from, to)
+        render()
+    }
+
+    private fun pickHour(@androidx.annotation.StringRes title: Int, current: Int, onPicked: (Int) -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(title))
+            .setSingleChoiceItems((0..23).map { hourLabel(it) }.toTypedArray(), current) { d, i ->
+                d.dismiss()
+                onPicked(i)
+            }
+            .show()
+    }
+
     private fun applySettings(change: () -> Unit) {
         val before = Settings.source(this) to Settings.queue(this)
         change()
@@ -338,7 +386,15 @@ class MainActivity : Activity() {
             row.label.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
             row.sw.isChecked = on
         }
+
+        quietRow.text = getString(R.string.two_lines, getString(R.string.quiet_hours), quietLabel(Settings.quietFrom(this), Settings.quietTo(this)))
     }
+
+    private fun hourLabel(h: Int) = "%02d:00".format(h)
+
+    private fun quietLabel(from: Int, to: Int) =
+        if (!QuietHours.enabled(from, to)) getString(R.string.quiet_off)
+        else getString(R.string.time_range, hourLabel(from), hourLabel(to))
 
     private fun renderHead(st: Schedule.Status?, now: ZonedDateTime, switching: Boolean) {
         head.removeAllViews()

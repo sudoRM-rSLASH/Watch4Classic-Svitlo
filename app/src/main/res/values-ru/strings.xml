@@ -88,4 +88,12 @@
     <string name="notify_tomorrow_outages">Отключения: %1$s · всего %2$s</string>
     <string name="notify_tomorrow_none">Завтра без отключений</string>
     <string name="notify_action_open">Открыть график</string>
+
+    <string name="quiet_hours">Тихие часы</string>
+    <string name="quiet_off">Выключены</string>
+    <string name="quiet_custom">Другое…</string>
+    <string name="quiet_from">С</string>
+    <string name="quiet_to">До</string>
+    <string name="channel_quiet_name">Тихие часы</string>
+    <string name="channel_quiet_description">Уведомления в тихие часы: без звука и вибрации</string>
 </resources>

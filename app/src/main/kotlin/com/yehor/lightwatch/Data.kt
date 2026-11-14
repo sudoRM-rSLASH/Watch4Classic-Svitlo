@@ -116,6 +116,14 @@ object Settings {
         p(c).edit().putInt("notifyOff", off).putInt("notifyOn", on).apply()
     }
 
+    /**
+     * Quiet hours: from this hour (0..23) to that hour, exclusive, possibly across midnight. Notifications
+     * that arrive then are posted silently. Equal hours mean off, which is the default.
+     */
+    fun quietFrom(c: Context): Int = p(c).getInt("quietFrom", 0)
+    fun quietTo(c: Context): Int = p(c).getInt("quietTo", 0)
+    fun setQuiet(c: Context, from: Int, to: Int) { p(c).edit().putInt("quietFrom", from).putInt("quietTo", to).apply() }
+
     /** Notify when the schedule for today changed. Off by default. */
     fun notifyTodayChanged(c: Context): Boolean = p(c).getBoolean("notifyTodayChanged", false)
     fun setNotifyTodayChanged(c: Context, v: Boolean) { p(c).edit().putBoolean("notifyTodayChanged", v).apply() }

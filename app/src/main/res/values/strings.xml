@@ -104,4 +104,13 @@
     <string name="notify_tomorrow_outages">Outages: %1$s · %2$s total</string>
     <string name="notify_tomorrow_none">No outages tomorrow</string>
     <string name="notify_action_open">Open schedule</string>
+
+    <!-- Quiet hours -->
+    <string name="quiet_hours">Quiet hours</string>
+    <string name="quiet_off">Off</string>
+    <string name="quiet_custom">Custom…</string>
+    <string name="quiet_from">From</string>
+    <string name="quiet_to">Until</string>
+    <string name="channel_quiet_name">Quiet hours</string>
+    <string name="channel_quiet_description">Notifications during quiet hours: no sound, no vibration</string>
 </resources>

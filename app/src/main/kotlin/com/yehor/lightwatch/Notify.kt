@@ -122,6 +122,33 @@ object Notify {
         )
     }
 
+    // ---------------------------------------------------------------- quiet hours
+
+    private const val CHANNEL_QUIET = "quiet"
+
+    /**
+     * Quiet hours apply to every notification of the app: during them a notification is posted to this low
+     * importance channel, so it still lands in the shelf but makes no sound, no vibration and does not
+     * pop up or wake the screen. (Dropping the notification would lose information, for example a schedule
+     * that is usually published in the evening.)
+     */
+    private fun quietChannel(c: Context) {
+        val nm = c.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CHANNEL_QUIET) != null) return
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_QUIET, c.getString(R.string.channel_quiet_name), NotificationManager.IMPORTANCE_LOW
+            ).apply { description = c.getString(R.string.channel_quiet_description) }
+        )
+    }
+
+    /** The channel to post to: [normal], or the silent one during quiet hours. */
+    private fun channelFor(c: Context, normal: String, now: ZonedDateTime): String {
+        if (!QuietHours.active(Settings.quietFrom(c), Settings.quietTo(c), now.hour)) return normal
+        quietChannel(c)
+        return CHANNEL_QUIET
+    }
+
     // ---------------------------------------------------------------- schedule changes
 
     private const val CHANNEL_CHANGES = "schedule_changes"
@@ -181,7 +208,7 @@ object Notify {
         val open = PendingIntent.getActivity(
             c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val n = android.app.Notification.Builder(c, CHANNEL_CHANGES)
+        val n = android.app.Notification.Builder(c, channelFor(c, CHANNEL_CHANGES, ZonedDateTime.now(Schedule.ZONE)))
             .setSmallIcon(R.drawable.ic_bolt_mono)
             .setContentTitle(title)
             .setContentText(text)
@@ -214,7 +241,7 @@ object Notify {
         val open = PendingIntent.getActivity(
             c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val n = android.app.Notification.Builder(c, CHANNEL)
+        val n = android.app.Notification.Builder(c, channelFor(c, CHANNEL, now))
             .setSmallIcon(if (off) R.drawable.ic_bolt_off_mono else R.drawable.ic_bolt_mono)
             .setContentTitle(title)
             .setContentText(text)
