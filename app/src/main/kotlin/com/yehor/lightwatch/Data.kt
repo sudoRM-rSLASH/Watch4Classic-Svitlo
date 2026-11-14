@@ -1,5 +1,6 @@
 package com.yehor.lightwatch
 
+import android.app.job.JobScheduler
 import android.content.Context
 import androidx.wear.tiles.TileService
 import androidx.work.Constraints
@@ -289,12 +290,17 @@ object Refresh {
             val wm = WorkManager.getInstance(c.applicationContext)
             wm.cancelUniqueWork("periodic") // old 30-minute job
             wm.cancelUniqueWork("periodic15") // old 15-minute job
-            // UPDATE instead of KEEP: KEEP trusts the WorkManager database and never looks at the system job,
-            // but after a reboot the JobScheduler job can be gone while the database still says "enqueued"
-            // (seen on the watch: no refresh job for 21 h after a reboot). UPDATE keeps the schedule but
-            // registers the job again.
+            // KEEP trusts the WorkManager database and never looks at the system job, but after a reboot the
+            // JobScheduler job can be gone while the database still says "enqueued" (seen on the watch: no
+            // refresh job for 21 h after a reboot; neither KEEP nor UPDATE brings it back). So look at
+            // JobScheduler itself: if our periodic job is not there, replace the work, which registers it.
+            // Only the periodic job requires "battery not low", this tells it from the one-off refresh job.
+            val hasJob = c.getSystemService(JobScheduler::class.java).allPendingJobs.any {
+                it.service.className == JOB_SERVICE && it.isRequireBatteryNotLow
+            }
             wm.enqueueUniquePeriodicWork(
-                "periodic30", ExistingPeriodicWorkPolicy.UPDATE,
+                "periodic30",
+                if (hasJob) ExistingPeriodicWorkPolicy.KEEP else ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
                 PeriodicWorkRequestBuilder<RefreshWorker>(30, TimeUnit.MINUTES, 10, TimeUnit.MINUTES)
                     .setConstraints(netBatteryOk).build()
             )
@@ -303,6 +309,8 @@ object Refresh {
     }
 
     @Volatile private var ensured = false
+
+    private const val JOB_SERVICE = "androidx.work.impl.background.systemjob.SystemJobService"
 
     /** One-off refresh now. */
     fun now(c: Context) {
