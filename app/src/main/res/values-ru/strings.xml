@@ -55,8 +55,8 @@
     <string name="updated_at">Обновлено %1$s</string>
     <string name="never_updated">Ещё не обновлялось</string>
     <string name="notifications_blocked">⚠ уведомления запрещены</string>
-    <string name="yellow_as_outage">Жёлтые слоты\nсчитать отключением</string>
-    <string name="yellow_as_power">Жёлтые слоты\nсчитать светом</string>
+    <string name="yellow_as_outage">Жёлтые слоты\nозначают отключение</string>
+    <string name="yellow_as_power">Жёлтые слоты\nозначают свет есть</string>
     <string name="loading">загружаю…</string>
     <string name="press_refresh">нажми «Обновить»</string>
     <string name="no_outages">без отключений</string>
