@@ -68,8 +68,8 @@
     <string name="never_updated">Not updated yet</string>
     <string name="warning_prefix" translatable="false">⚠ %1$s</string>
     <string name="notifications_blocked">⚠ notifications are blocked</string>
-    <string name="yellow_is_off">Yellow = OFF\nin the countdown</string>
-    <string name="yellow_is_on">Yellow = ON\nin the countdown</string>
+    <string name="yellow_as_outage">Yellow slots\ncount as no power</string>
+    <string name="yellow_as_power">Yellow slots\ncount as power on</string>
     <string name="loading">loading…</string>
     <string name="press_refresh">press “Refresh”</string>
     <string name="no_outages">no outages</string>

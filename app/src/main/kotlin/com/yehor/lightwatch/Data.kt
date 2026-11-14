@@ -165,9 +165,17 @@ object Store {
         return parseDays(s).also { parsed = s to it }
     }
 
+    /**
+     * Slot states (0 on, 1 off, 2 yellow) to "no power" flags. A yellow slot is the time needed for switching
+     * after an outage ("power may be absent"): it counts as no power when [maybeIsOff], else as power on.
+     * So the setting only moves the end of an outage, never its start.
+     */
+    fun flagsOf(raw: Map<LocalDate, IntArray>, maybeIsOff: Boolean): Map<LocalDate, BooleanArray> =
+        raw.mapValues { (_, a) -> BooleanArray(a.size) { a[it] == 1 || (maybeIsOff && a[it] == 2) } }
+
     /** true: no power (including "may be off" while switching). */
     fun load(c: Context, maybeIsOff: Boolean = true): Map<LocalDate, BooleanArray> =
-        raw(c).mapValues { (_, a) -> BooleanArray(a.size) { a[it] == 1 || (maybeIsOff && a[it] == 2) } }
+        flagsOf(raw(c), maybeIsOff)
 
     /** true: switching slot, power may be off. */
     fun loadMaybe(c: Context): Map<LocalDate, BooleanArray> =

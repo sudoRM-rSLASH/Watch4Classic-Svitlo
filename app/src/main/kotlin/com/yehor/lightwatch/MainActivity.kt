@@ -326,7 +326,7 @@ class MainActivity : Activity() {
             row.setTextColor(if (warn) Palette.AMBER else Palette.GREY)
         }
         val maybeOff = Settings.maybeIsOff(this)
-        maybeRow.text = getString(if (maybeOff) R.string.yellow_is_off else R.string.yellow_is_on)
+        maybeRow.text = getString(if (maybeOff) R.string.yellow_as_outage else R.string.yellow_as_power)
         maybeSwitch.isChecked = maybeOff
     }
 
