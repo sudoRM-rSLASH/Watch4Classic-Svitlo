@@ -3,8 +3,6 @@ package com.yehor.lightwatch
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -47,6 +45,8 @@ class MainActivity : Activity() {
     private lateinit var notifyOnRow: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var busy = false
+    private var sidePx = 0
+    private var todayDial: DialView? = null
 
     /** What the lists and the footer were built for: the day, the half-hour slot, the data and its error. */
     private var shownSlot = ""
@@ -70,13 +70,17 @@ class MainActivity : Activity() {
 
         val w = resources.displayMetrics.widthPixels
         val side = (w * 0.15f).toInt()
+        sidePx = side
 
         head = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             minimumHeight = (w * 0.62f).toInt()
         }
-        lists = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lists = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false // the rings reach over the side padding of the column
+        }
         footer = label(11f, Palette.LABEL).apply { gravity = Gravity.CENTER }
         btn = pill(getString(R.string.refresh), Palette.GREEN, Palette.BG).apply { setOnClickListener { refreshNow() } }
         sourceRow = settingRow { pickSource() }
@@ -104,6 +108,8 @@ class MainActivity : Activity() {
         quietRow = settingRow { pickQuiet() }
 
         val col = LinearLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false // the rings reach over the side padding
             orientation = LinearLayout.VERTICAL
             setPadding(side, (w * 0.12f).toInt(), side, (w * 0.22f).toInt())
             addView(head, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -325,6 +331,7 @@ class MainActivity : Activity() {
         val maybe = Store.loadMaybe(this)
         val now = ZonedDateTime.now(Schedule.ZONE)
         renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
+        todayDial?.setNow(now.hour * 60 + now.minute) // the "now" mark of today's ring
     }
 
     private fun renderContent() {
@@ -335,9 +342,11 @@ class MainActivity : Activity() {
         renderHead(Schedule.status(days, now), now, Schedule.at(maybe, now) == true)
 
         lists.removeAllViews()
+        todayDial = null
         val today = now.toLocalDate()
-        dayBlock(getString(R.string.today), days[today], maybe[today], Schedule.slotOf(now))
-        dayBlock(getString(R.string.tomorrow), days[today.plusDays(1)], maybe[today.plusDays(1)], -1)
+        val tomorrow = today.plusDays(1)
+        dayBlock(R.string.today, today, days[today], maybe[today], Schedule.slotOf(now), now.hour * 60 + now.minute)
+        dayBlock(R.string.tomorrow, tomorrow, days[tomorrow], maybe[tomorrow], -1, -1)
         if (maybe.values.any { m -> m.any { it } }) {
             lists.addView(label(11f, Palette.LABEL).apply {
                 text = getString(R.string.yellow_hint)
@@ -443,35 +452,49 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun dayBlock(title: String, flags: BooleanArray?, maybe: BooleanArray?, curSlot: Int) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(14f).toInt(), 0, dp(6f).toInt())
-        }
-        row.addView(label(14f, Palette.WHITE, bold = true).apply { text = title; maxLines = 1 },
-            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
-        row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        row.addView(label(12f, Palette.LABEL).apply {
-            text = when {
-                flags == null -> ""
-                flags.none { it } -> getString(R.string.no_outages)
-                else -> getString(R.string.minus, Fmt.duration(this@MainActivity, Schedule.offDuration(flags)))
+    /**
+     * One day: a screen-wide 24-hour ring with the day, its date and the total in the middle, then the list
+     * of outages. The days are told apart by the title in the ring and by a divider and a gap between them.
+     * [curSlot] and [nowMinute] are -1 for a day other than today (nothing is over, no "now" mark).
+     */
+    private fun dayBlock(
+        @androidx.annotation.StringRes titleRes: Int, date: java.time.LocalDate,
+        flags: BooleanArray?, maybe: BooleanArray?, curSlot: Int, nowMinute: Int,
+    ) {
+        val summary: String
+        val summaryColor: Int
+        when {
+            flags == null -> { summary = getString(R.string.no_schedule_yet); summaryColor = Palette.LABEL }
+            flags.none { it } -> { summary = getString(R.string.power_all_day); summaryColor = Palette.GREEN }
+            else -> {
+                summary = getString(R.string.minus, Fmt.duration(this, Schedule.offDuration(flags)))
+                summaryColor = Palette.RED
             }
-            if (flags != null && flags.any { it }) setTextColor(Palette.RED)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(6f).toInt() })
-        lists.addView(row)
-
-        if (flags == null) {
-            lists.addView(label(13f, Palette.LABEL).apply { text = getString(R.string.no_schedule_yet) })
-            return
         }
-        lists.addView(StripView(this, flags, maybe, curSlot), LinearLayout.LayoutParams(MATCH_PARENT, dp(10f).toInt()).apply {
-            bottomMargin = dp(6f).toInt()
+        val dial = DialView(
+            this,
+            DialData(
+                flags, maybe, curSlot, nowMinute, Settings.maybeIsOff(this),
+                date.format(DateTimeFormatter.ofPattern("d MMMM", java.util.Locale.getDefault())),
+                getString(titleRes), summary, summaryColor
+            )
+        )
+        if (curSlot >= 0) todayDial = dial
+
+        if (lists.childCount > 0) {
+            lists.addView(View(this).apply { setBackgroundColor(Palette.CARD) },
+                LinearLayout.LayoutParams(MATCH_PARENT, dp(2f).toInt()).apply {
+                    topMargin = dp(18f).toInt()
+                    bottomMargin = dp(10f).toInt()
+                })
+        }
+        // the ring fills the whole width of the round screen, so it reaches over the side padding of the column
+        lists.addView(dial, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+            leftMargin = -sidePx
+            rightMargin = -sidePx
         })
+
+        if (flags == null) return
         val ranges = Schedule.offRanges(flags)
         if (ranges.isEmpty()) lists.addView(label(13f, Palette.GREEN).apply { text = getString(R.string.power_all_day) })
         for ((a, b) in ranges) {
@@ -562,30 +585,3 @@ class MainActivity : Activity() {
 }
 
 private class SwitchRow(val label: TextView, val sw: Switch, val card: LinearLayout)
-
-/** Horizontal strip of the day (48 slots of 30 min). */
-private class StripView(c: Context, val flags: BooleanArray, val maybe: BooleanArray?, val curSlot: Int) : View(c) {
-    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    override fun onDraw(cv: Canvas) {
-        val n = flags.size
-        val gap = resources.displayMetrics.density * 0.75f
-        val cw = (width - gap * (n - 1)) / n
-        val r = cw / 2
-        for (i in 0 until n) {
-            val past = curSlot >= 0 && i < curSlot
-            val m = maybe?.getOrNull(i) == true
-            p.color = when {
-                m && past -> Palette.AMBER_DIM
-                m -> Palette.AMBER
-                flags[i] && past -> Palette.RED_DIM
-                flags[i] -> Palette.RED
-                past -> Palette.GREEN_DIM
-                else -> Palette.GREEN
-            }
-            val x = i * (cw + gap)
-            val top = if (i == curSlot) 0f else height * 0.2f
-            val bottom = if (i == curSlot) height.toFloat() else height * 0.8f
-            cv.drawRoundRect(x, top, x + cw, bottom, r, r, p)
-        }
-    }
-}
