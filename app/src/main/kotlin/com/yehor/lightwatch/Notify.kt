@@ -187,6 +187,13 @@ object Notify {
             .setContentText(text)
             .setStyle(android.app.Notification.BigTextStyle().bigText(text))
             .setContentIntent(open)
+            // an explicit button as well: on a watch a tap on the card body is easy to miss
+            .addAction(
+                android.app.Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(c, R.drawable.ic_bolt_mono),
+                    c.getString(R.string.notify_action_open), open
+                ).build()
+            )
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setCategory(android.app.Notification.CATEGORY_STATUS)

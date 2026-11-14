@@ -87,4 +87,5 @@
     <string name="notify_removed">Прибрано: %1$s</string>
     <string name="notify_tomorrow_outages">Відключення: %1$s · разом %2$s</string>
     <string name="notify_tomorrow_none">Завтра без відключень</string>
+    <string name="notify_action_open">Відкрити графік</string>
 </resources>

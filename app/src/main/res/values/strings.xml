@@ -103,4 +103,5 @@
     <string name="notify_removed">Removed: %1$s</string>
     <string name="notify_tomorrow_outages">Outages: %1$s · %2$s total</string>
     <string name="notify_tomorrow_none">No outages tomorrow</string>
+    <string name="notify_action_open">Open schedule</string>
 </resources>
