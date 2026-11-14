@@ -148,9 +148,14 @@ object Notify {
     }
 }
 
-/** Notification alarm; also reschedules on reboot, app update and clock/time zone changes. */
+/**
+ * Notification alarm; also reschedules on reboot, app update and clock/time zone changes.
+ * The boot and update broadcasts start the process, so they are also the moment to make sure the periodic
+ * data refresh is registered again (nothing else would start the app after a reboot until the tile is shown).
+ */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, intent: Intent) {
+        Refresh.ensure(c)
         if (intent.hasExtra("at")) {
             val at = Instant.ofEpochMilli(intent.getLongExtra("at", 0)).atZone(Schedule.ZONE)
             // the schedule may have changed since scheduling: notify only if the event still holds

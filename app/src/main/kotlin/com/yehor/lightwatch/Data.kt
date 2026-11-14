@@ -289,8 +289,12 @@ object Refresh {
             val wm = WorkManager.getInstance(c.applicationContext)
             wm.cancelUniqueWork("periodic") // old 30-minute job
             wm.cancelUniqueWork("periodic15") // old 15-minute job
+            // UPDATE instead of KEEP: KEEP trusts the WorkManager database and never looks at the system job,
+            // but after a reboot the JobScheduler job can be gone while the database still says "enqueued"
+            // (seen on the watch: no refresh job for 21 h after a reboot). UPDATE keeps the schedule but
+            // registers the job again.
             wm.enqueueUniquePeriodicWork(
-                "periodic30", ExistingPeriodicWorkPolicy.KEEP,
+                "periodic30", ExistingPeriodicWorkPolicy.UPDATE,
                 PeriodicWorkRequestBuilder<RefreshWorker>(30, TimeUnit.MINUTES, 10, TimeUnit.MINUTES)
                     .setConstraints(netBatteryOk).build()
             )
