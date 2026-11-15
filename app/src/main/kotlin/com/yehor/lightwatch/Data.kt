@@ -124,6 +124,14 @@ object Settings {
     fun quietTo(c: Context): Int = p(c).getInt("quietTo", 0)
     fun setQuiet(c: Context, from: Int, to: Int) { p(c).edit().putInt("quietFrom", from).putInt("quietTo", to).apply() }
 
+    /** How the day is drawn on the tile: 1 = one ring of 24 hours, 2 = two rings of 12 hours. */
+    fun tileRings(c: Context): Int = if (p(c).getInt("tileRings", 1) == 2) 2 else 1
+    fun setTileRings(c: Context, rings: Int) { p(c).edit().putInt("tileRings", if (rings == 2) 2 else 1).apply() }
+
+    /** With two rings on the tile: also label the hours 12-24 inside the inner ring (default), or only 0-12 outside. */
+    fun tileInnerLabels(c: Context): Boolean = p(c).getBoolean("tileInnerLabels", true)
+    fun setTileInnerLabels(c: Context, v: Boolean) { p(c).edit().putBoolean("tileInnerLabels", v).apply() }
+
     /** Notify when the schedule for today changed. Off by default. */
     fun notifyTodayChanged(c: Context): Boolean = p(c).getBoolean("notifyTodayChanged", false)
     fun setNotifyTodayChanged(c: Context, v: Boolean) { p(c).edit().putBoolean("notifyTodayChanged", v).apply() }

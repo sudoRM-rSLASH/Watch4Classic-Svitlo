@@ -41,6 +41,10 @@ class MainActivity : Activity() {
     private lateinit var notifyToday: SwitchRow
     private lateinit var notifyTomorrow: SwitchRow
     private lateinit var quietRow: TextView
+    private lateinit var tileRow: TextView
+    private lateinit var tileLabelsRow: TextView
+    private lateinit var settingsBox: LinearLayout
+    private lateinit var settingsBtn: TextView
     private lateinit var notifyOffRow: TextView
     private lateinit var notifyOnRow: TextView
     private val ui = Handler(Looper.getMainLooper())
@@ -106,6 +110,32 @@ class MainActivity : Activity() {
         }
 
         quietRow = settingRow { pickQuiet() }
+        tileRow = settingRow { pickTileRings() }
+        tileLabelsRow = settingRow { pickTileLabels() }
+
+        settingsBtn = settingRow { toggleSettings() }.apply { gravity = Gravity.CENTER }
+        settingsBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding(0, dp(8f).toInt(), 0, 0)
+            val gap = dp(6f).toInt()
+            fun add(v: View, last: Boolean = false) =
+                addView(v, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { if (!last) bottomMargin = gap })
+            add(sourceRow)
+            add(queueRow)
+            add(yellow.card)
+            add(tileRow)
+            add(tileLabelsRow)
+            addView(label(13f, Palette.WHITE, bold = true).apply {
+                text = getString(R.string.notifications)
+                setPadding(0, dp(12f).toInt(), 0, dp(4f).toInt())
+            })
+            add(notifyOffRow)
+            add(notifyOnRow)
+            add(notifyToday.card)
+            add(notifyTomorrow.card)
+            add(quietRow, last = true)
+        }
 
         val col = LinearLayout(this).apply {
             clipChildren = false
@@ -120,34 +150,11 @@ class MainActivity : Activity() {
             addView(btn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
                 topMargin = dp(8f).toInt()
             })
-            addView(label(13f, Palette.WHITE, bold = true).apply {
-                text = getString(R.string.settings)
-                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
+            // The settings are hidden behind a button: most of the time the screen is for reading the schedule.
+            addView(settingsBtn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                topMargin = dp(14f).toInt()
             })
-            addView(sourceRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(queueRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(yellow.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(label(13f, Palette.WHITE, bold = true).apply {
-                text = getString(R.string.notifications)
-                setPadding(0, dp(18f).toInt(), 0, dp(4f).toInt())
-            })
-            addView(notifyOffRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(notifyOnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(notifyToday.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(notifyTomorrow.card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                bottomMargin = dp(6f).toInt()
-            })
-            addView(quietRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            addView(settingsBox, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         scroll = ScrollView(this).apply {
             isFocusable = true
@@ -259,6 +266,44 @@ class MainActivity : Activity() {
             .setSingleChoiceItems(all.map { getString(R.string.queue_name, it) }.toTypedArray(), all.indexOf(Settings.queue(this))) { d, i ->
                 d.dismiss()
                 applySettings { Settings.set(this, queue = all[i]) }
+            }
+            .show()
+    }
+
+    private fun toggleSettings() {
+        val open = settingsBox.visibility != View.VISIBLE
+        settingsBox.visibility = if (open) View.VISIBLE else View.GONE
+        settingsBtn.text = getString(
+            if (open) R.string.settings_expanded else R.string.settings_collapsed, getString(R.string.settings)
+        )
+        // bring the opened settings under the thumb
+        if (open) scroll.post { scroll.smoothScrollTo(0, settingsBtn.top - dp(10f).toInt()) }
+    }
+
+    /** How the day is drawn on the tile: one ring of 24 hours or two rings of 12 hours. */
+    private fun pickTileRings() {
+        val items = arrayOf(getString(R.string.tile_rings_one), getString(R.string.tile_rings_two))
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.tile_rings_title))
+            .setSingleChoiceItems(items, Settings.tileRings(this) - 1) { d, i ->
+                d.dismiss()
+                Settings.setTileRings(this, i + 1)
+                Fetcher.notifyAll(this) // redraw the tile (and the complication) right away
+                render()
+            }
+            .show()
+    }
+
+    /** With two rings: label the hours only outside (0-12) or inside the inner ring as well (12-24). */
+    private fun pickTileLabels() {
+        val items = arrayOf(getString(R.string.tile_labels_outer), getString(R.string.tile_labels_both))
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.tile_labels_title))
+            .setSingleChoiceItems(items, if (Settings.tileInnerLabels(this)) 1 else 0) { d, i ->
+                d.dismiss()
+                Settings.setTileInnerLabels(this, i == 1)
+                Fetcher.notifyAll(this)
+                render()
             }
             .show()
     }
@@ -396,6 +441,18 @@ class MainActivity : Activity() {
             row.sw.isChecked = on
         }
 
+        settingsBtn.text = getString(
+            if (settingsBox.visibility == View.VISIBLE) R.string.settings_expanded else R.string.settings_collapsed,
+            getString(R.string.settings)
+        )
+        tileRow.text = getString(
+            R.string.two_lines, getString(R.string.tile_rings_title),
+            getString(if (Settings.tileRings(this) == 2) R.string.tile_rings_two else R.string.tile_rings_one)
+        )
+        tileLabelsRow.text = getString(
+            R.string.two_lines, getString(R.string.tile_labels_title),
+            getString(if (Settings.tileInnerLabels(this)) R.string.tile_labels_both else R.string.tile_labels_outer)
+        )
         quietRow.text = getString(R.string.two_lines, getString(R.string.quiet_hours), quietLabel(Settings.quietFrom(this), Settings.quietTo(this)))
     }
 

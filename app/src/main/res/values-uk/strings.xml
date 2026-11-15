@@ -96,4 +96,11 @@
     <string name="quiet_to">До</string>
     <string name="channel_quiet_name">Тихі сповіщення</string>
     <string name="channel_quiet_description">Сповіщення в тихі години: без звуку і вібрації</string>
+
+    <string name="tile_rings_title">Кільце на тайлі</string>
+    <string name="tile_rings_one">Одне кільце, 24 год</string>
+    <string name="tile_rings_two">Два кільця по 12 год</string>
+    <string name="tile_labels_title">Підписи годин (два кільця)</string>
+    <string name="tile_labels_outer">Тільки ззовні (0–12)</string>
+    <string name="tile_labels_both">Ззовні і всередині (0–24)</string>
 </resources>

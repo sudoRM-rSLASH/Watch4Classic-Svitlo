@@ -37,6 +37,8 @@ class LightTileService : TileService() {
     private var queue = ""
     private var maybe: Map<LocalDate, BooleanArray> = emptyMap()
     private var stale = false
+    private var rings = 1
+    private var innerLabels = true
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         Refresh.ifStale(this)
@@ -47,6 +49,8 @@ class LightTileService : TileService() {
         val err = Store.error(this)
         val fetched = Store.fetchedAt(this)
         queue = Settings.queue(this)
+        rings = Settings.tileRings(this)
+        innerLabels = Settings.tileInnerLabels(this)
         val start = ZonedDateTime.now(Schedule.ZONE).truncatedTo(ChronoUnit.MINUTES)
         // Half-hour slot boundaries: within a slot only the countdown changes, and the watch computes it.
         val firstBoundary = start.truncatedTo(ChronoUnit.HOURS).plusMinutes(if (start.minute >= 30) 60 else 30)
@@ -117,17 +121,22 @@ class LightTileService : TileService() {
                     )
                     .build()
             )
-            .addContent(ring(days, now))
-            .addContent(TileRing.hours(DialModel.hourOf(now.hour * 60 + now.minute)))
-            .addContent(TileRing.nowMark(now.toLocalDate(), now.hour * 60 + now.minute))
+            .apply { ring(days, now).forEach { addContent(it) } }
             .addContent(center(st, now, err, fetched))
             .build()
     }
 
-    /** Today's 48 dashes: slots that are over are dark, yellow slots follow the "yellow slots" setting. */
-    private fun ring(days: Map<LocalDate, BooleanArray>, now: ZonedDateTime): LayoutElement {
+    /**
+     * The day around the tile (one ring of 24 h or two of 12 h, by the setting): slots that are over are dark,
+     * yellow slots follow the "yellow slots" setting.
+     */
+    private fun ring(days: Map<LocalDate, BooleanArray>, now: ZonedDateTime): List<LayoutElement> {
         val date = now.toLocalDate()
-        return TileRing.dashes(days[date], maybe[date], Schedule.slotOf(now), Settings.maybeIsOff(this))
+        val minute = now.hour * 60 + now.minute
+        return TileRing.layers(
+            rings, days[date], maybe[date], Schedule.slotOf(now), Settings.maybeIsOff(this),
+            date, minute, DialModel.hourOf(minute), innerLabels
+        )
     }
 
     private fun center(
@@ -195,7 +204,7 @@ class LightTileService : TileService() {
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
-                    .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(CENTER_PADDING_DP)).build())
+                    .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(TileRing.centerPaddingDp(rings, innerLabels))).build())
                     .build()
             )
             .addContent(col.build())
@@ -235,7 +244,7 @@ class LightTileService : TileService() {
             .setMaxLines(1)
             .setFontStyle(
                 FontStyle.Builder()
-                    .setSize(sp(30f))
+                    .setSize(sp(TileRing.countdownSp(rings, innerLabels)))
                     .setColor(argb(WHITE))
                     .setWeight(LayoutElementBuilders.FONT_WEIGHT_BOLD)
                     .build()
@@ -264,8 +273,6 @@ class LightTileService : TileService() {
 
     private companion object {
         const val RES_VERSION = "4"
-        /** Keeps the text inside the ring (the hour labels are outside of it). */
-        const val CENTER_PADDING_DP = 28f
         /**
          * Half-hour layouts ahead (~6 h). A layout per slot is needed because the strip shifts every 30 min,
          * so a longer timeline means fewer tile rebuilds; real changes of the data call requestUpdate().
