@@ -43,6 +43,8 @@ class MainActivity : Activity() {
     private lateinit var quietRow: TextView
     private lateinit var tileRow: TextView
     private lateinit var tileLabelsRow: TextView
+    private lateinit var appRingsRow: TextView
+    private lateinit var appLabelsRow: TextView
     private lateinit var settingsBox: LinearLayout
     private lateinit var settingsBtn: TextView
     private lateinit var notifyOffRow: TextView
@@ -112,6 +114,8 @@ class MainActivity : Activity() {
         quietRow = settingRow { pickQuiet() }
         tileRow = settingRow { pickTileRings() }
         tileLabelsRow = settingRow { pickTileLabels() }
+        appRingsRow = settingRow { pickAppRings() }
+        appLabelsRow = settingRow { pickAppLabels() }
 
         settingsBtn = settingRow { toggleSettings() }.apply { gravity = Gravity.CENTER }
         settingsBox = LinearLayout(this).apply {
@@ -126,6 +130,8 @@ class MainActivity : Activity() {
             add(yellow.card)
             add(tileRow)
             add(tileLabelsRow)
+            add(appRingsRow)
+            add(appLabelsRow)
             addView(label(13f, Palette.WHITE, bold = true).apply {
                 text = getString(R.string.notifications)
                 setPadding(0, dp(12f).toInt(), 0, dp(4f).toInt())
@@ -308,6 +314,31 @@ class MainActivity : Activity() {
             .show()
     }
 
+    /** The same choice for the day dials in the app; it does not touch the tile. */
+    private fun pickAppRings() {
+        val items = arrayOf(getString(R.string.tile_rings_one), getString(R.string.tile_rings_two))
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.app_rings_title))
+            .setSingleChoiceItems(items, Settings.appRings(this) - 1) { d, i ->
+                d.dismiss()
+                Settings.setAppRings(this, i + 1)
+                render()
+            }
+            .show()
+    }
+
+    private fun pickAppLabels() {
+        val items = arrayOf(getString(R.string.tile_labels_outer), getString(R.string.tile_labels_both))
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.app_labels_title))
+            .setSingleChoiceItems(items, if (Settings.appInnerLabels(this)) 1 else 0) { d, i ->
+                d.dismiss()
+                Settings.setAppInnerLabels(this, i == 1)
+                render()
+            }
+            .show()
+    }
+
     /** Quiet hours: off, a ready-made window, or "Custom…" (the start hour, then the end hour). */
     private fun pickQuiet() {
         val from = Settings.quietFrom(this)
@@ -453,6 +484,14 @@ class MainActivity : Activity() {
             R.string.two_lines, getString(R.string.tile_labels_title),
             getString(if (Settings.tileInnerLabels(this)) R.string.tile_labels_both else R.string.tile_labels_outer)
         )
+        appRingsRow.text = getString(
+            R.string.two_lines, getString(R.string.app_rings_title),
+            getString(if (Settings.appRings(this) == 2) R.string.tile_rings_two else R.string.tile_rings_one)
+        )
+        appLabelsRow.text = getString(
+            R.string.two_lines, getString(R.string.app_labels_title),
+            getString(if (Settings.appInnerLabels(this)) R.string.tile_labels_both else R.string.tile_labels_outer)
+        )
         quietRow.text = getString(R.string.two_lines, getString(R.string.quiet_hours), quietLabel(Settings.quietFrom(this), Settings.quietTo(this)))
     }
 
@@ -533,7 +572,8 @@ class MainActivity : Activity() {
             DialData(
                 flags, maybe, curSlot, nowMinute, Settings.maybeIsOff(this),
                 date.format(DateTimeFormatter.ofPattern("d MMMM", java.util.Locale.getDefault())),
-                getString(titleRes), summary, summaryColor
+                getString(titleRes), summary, summaryColor,
+                Settings.appRings(this), Settings.appInnerLabels(this)
             )
         )
         if (curSlot >= 0) todayDial = dial

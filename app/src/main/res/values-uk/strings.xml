@@ -100,7 +100,9 @@
     <string name="tile_rings_title">Кільце на тайлі</string>
     <string name="tile_rings_one">Одне кільце, 24 год</string>
     <string name="tile_rings_two">Два кільця по 12 год</string>
-    <string name="tile_labels_title">Підписи годин (два кільця)</string>
+    <string name="tile_labels_title">Підписи годин на тайлі (два кільця)</string>
     <string name="tile_labels_outer">Тільки ззовні (0–12)</string>
     <string name="tile_labels_both">Ззовні і всередині (0–24)</string>
+    <string name="app_rings_title">Кільце в застосунку</string>
+    <string name="app_labels_title">Підписи годин у застосунку (два кільця)</string>
 </resources>

@@ -100,7 +100,9 @@
     <string name="tile_rings_title">Кольцо на тайле</string>
     <string name="tile_rings_one">Одно кольцо, 24 ч</string>
     <string name="tile_rings_two">Два кольца по 12 ч</string>
-    <string name="tile_labels_title">Подписи часов (два кольца)</string>
+    <string name="tile_labels_title">Подписи часов на тайле (два кольца)</string>
     <string name="tile_labels_outer">Только снаружи (0–12)</string>
     <string name="tile_labels_both">Снаружи и внутри (0–24)</string>
+    <string name="app_rings_title">Кольцо в приложении</string>
+    <string name="app_labels_title">Подписи часов в приложении (два кольца)</string>
 </resources>

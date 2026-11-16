@@ -120,7 +120,9 @@
     <string name="tile_rings_two">Two rings, 12 h each</string>
     <string name="settings_collapsed" translatable="false">%1$s ▸</string>
     <string name="settings_expanded" translatable="false">%1$s ▾</string>
-    <string name="tile_labels_title">Hour labels (two rings)</string>
+    <string name="tile_labels_title">Tile hour labels (two rings)</string>
     <string name="tile_labels_outer">Outside only (0–12)</string>
     <string name="tile_labels_both">Outside and inside (0–24)</string>
+    <string name="app_rings_title">Ring in the app</string>
+    <string name="app_labels_title">App hour labels (two rings)</string>
 </resources>

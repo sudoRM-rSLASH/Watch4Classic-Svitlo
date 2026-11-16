@@ -52,4 +52,29 @@ class DialModelTest {
         assertEquals(23, DialModel.hourOf(1439))
         assertEquals(0, DialModel.hourOf(0))
     }
+
+    @Test fun twoRingsSplitTheDayAtNoon() {
+        assertEquals(0, DialModel.ringOfSlot(23, 2))
+        assertEquals(1, DialModel.ringOfSlot(24, 2))
+        assertEquals(0, DialModel.ringOfSlot(47, 1))
+        assertEquals(0f, DialModel.slotAngle(24, 2), 0.001f)
+        assertEquals(15f, DialModel.slotAngle(25, 2), 0.001f)
+        assertEquals(7.5f, DialModel.slotAngle(1, 1), 0.001f)
+        assertEquals(15f, DialModel.slotDegrees(2), 0.001f)
+    }
+
+    @Test fun nowMarkGoesAroundTwiceADay() {
+        assertEquals(180f, DialModel.angleOfMinute(6 * 60, 2), 0.001f)
+        assertEquals(180f, DialModel.angleOfMinute(18 * 60, 2), 0.001f)
+        assertEquals(270f, DialModel.angleOfMinute(18 * 60, 1), 0.001f)
+        assertEquals(0, DialModel.ringOfMinute(11 * 60 + 59, 2))
+        assertEquals(1, DialModel.ringOfMinute(12 * 60, 2))
+        assertEquals(0, DialModel.ringOfMinute(20 * 60, 1))
+    }
+
+    @Test fun highlightFallsBackToTheOuterLabel() {
+        assertEquals(8, DialModel.hotLabel(20, 2, innerLabels = false))
+        assertEquals(20, DialModel.hotLabel(20, 2, innerLabels = true))
+        assertEquals(20, DialModel.hotLabel(20, 1, innerLabels = false))
+    }
 }
