@@ -38,4 +38,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.guava:guava:33.3.1-android")
     testImplementation("junit:junit:4.13.2")
+    // the proto types of ProtoLayout, to measure the size of the tile layouts in a unit test
+    testImplementation("androidx.wear.protolayout:protolayout-proto:1.2.1")
 }
