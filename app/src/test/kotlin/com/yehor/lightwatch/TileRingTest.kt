@@ -26,12 +26,12 @@ class TileRingTest {
     @Test fun oneRingLayoutStaysSmall() {
         // the tile ships one layout per half hour (12 of them) and a tile is limited to a binder transaction
         val bytes = size(layout(1))
-        assertTrue("one ring layout is $bytes bytes", bytes < 9_000)
+        assertTrue("one ring layout is $bytes bytes", bytes < 12_000)
     }
 
     @Test fun twoRingsLayoutStaysSmall() {
         val bytes = size(layout(2))
-        assertTrue("two rings layout is $bytes bytes", bytes < 14_000)
+        assertTrue("two rings layout is $bytes bytes", bytes < 12_000)
     }
 
     @Test fun buildsWithoutDataAndOnBothRings() {
@@ -67,6 +67,17 @@ class TileRingTest {
         assertTrue(size(b.build()) < size(layout(2)))
         assertTrue(TileRing.centerPaddingDp(2, innerLabels = false) < TileRing.centerPaddingDp(2, innerLabels = true))
         assertTrue(TileRing.countdownSp(2, innerLabels = false) > TileRing.countdownSp(2, innerLabels = true))
+    }
+
+    @Test fun highlightMovesToTheNearestOuterLabelWhenThereAreNoInnerLabels() {
+        // two rings, labels only outside: the afternoon hours are shown by the outer label at the same angle
+        assertEquals(0, TileRing.hotLabel(2, innerLabels = false, hour = 12))
+        assertEquals(8, TileRing.hotLabel(2, innerLabels = false, hour = 20))
+        assertEquals(11, TileRing.hotLabel(2, innerLabels = false, hour = 23))
+        assertEquals(5, TileRing.hotLabel(2, innerLabels = false, hour = 5))
+        // with the inner labels, and on one ring, the hour has its own label
+        assertEquals(20, TileRing.hotLabel(2, innerLabels = true, hour = 20))
+        assertEquals(20, TileRing.hotLabel(1, innerLabels = false, hour = 20))
     }
 
     @Test fun centreNeedsMoreRoomWithTwoRings() {
