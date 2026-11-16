@@ -132,6 +132,10 @@ object Settings {
     fun tileInnerLabels(c: Context): Boolean = p(c).getBoolean("tileInnerLabels", true)
     fun setTileInnerLabels(c: Context, v: Boolean) { p(c).edit().putBoolean("tileInnerLabels", v).apply() }
 
+    /** Show "then 2h without power" under the time of the next change on the tile. On by default. */
+    fun tileShowNext(c: Context): Boolean = p(c).getBoolean("tileShowNext", true)
+    fun setTileShowNext(c: Context, v: Boolean) { p(c).edit().putBoolean("tileShowNext", v).apply() }
+
     /** The same two settings for the day dials inside the app (kept apart from the tile's). */
     fun appRings(c: Context): Int = if (p(c).getInt("appRings", 1) == 2) 2 else 1
     fun setAppRings(c: Context, rings: Int) { p(c).edit().putInt("appRings", if (rings == 2) 2 else 1).apply() }

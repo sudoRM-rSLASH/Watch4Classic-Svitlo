@@ -125,4 +125,5 @@
     <string name="tile_labels_both">Outside and inside (0–24)</string>
     <string name="app_rings_title">Ring in the app</string>
     <string name="app_labels_title">App hour labels (two rings)</string>
+    <string name="tile_next_title">Tile: how long the next phase lasts</string>
 </resources>

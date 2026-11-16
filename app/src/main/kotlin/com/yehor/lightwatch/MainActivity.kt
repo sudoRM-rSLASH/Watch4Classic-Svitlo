@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var queueRow: TextView
     private lateinit var yellow: SwitchRow
     private lateinit var notifyToday: SwitchRow
+    private lateinit var tileNext: SwitchRow
     private lateinit var notifyTomorrow: SwitchRow
     private lateinit var quietRow: TextView
     private lateinit var tileRow: TextView
@@ -98,6 +99,11 @@ class MainActivity : Activity() {
             Fetcher.notifyAll(this)
             render()
         }
+        tileNext = switchRow {
+            Settings.setTileShowNext(this, !Settings.tileShowNext(this))
+            Fetcher.notifyAll(this) // redraw the tile right away
+            render()
+        }
         notifyToday = switchRow {
             val on = !Settings.notifyTodayChanged(this)
             Settings.setNotifyTodayChanged(this, on)
@@ -130,6 +136,7 @@ class MainActivity : Activity() {
             add(yellow.card)
             add(tileRow)
             add(tileLabelsRow)
+            add(tileNext.card)
             add(appRingsRow)
             add(appLabelsRow)
             addView(label(13f, Palette.WHITE, bold = true).apply {
@@ -460,6 +467,9 @@ class MainActivity : Activity() {
         val maybeOff = Settings.maybeIsOff(this)
         yellow.label.text = getString(if (maybeOff) R.string.yellow_as_outage else R.string.yellow_as_power)
         yellow.sw.isChecked = maybeOff
+
+        tileNext.label.text = getString(R.string.tile_next_title)
+        tileNext.sw.isChecked = Settings.tileShowNext(this)
 
         for ((row, title, on) in listOf(
             Triple(notifyToday, getString(R.string.notify_setting_today), Settings.notifyTodayChanged(this)),

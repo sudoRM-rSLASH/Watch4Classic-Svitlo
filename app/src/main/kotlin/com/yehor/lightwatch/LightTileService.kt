@@ -39,6 +39,7 @@ class LightTileService : TileService() {
     private var stale = false
     private var rings = 1
     private var innerLabels = true
+    private var showNext = true
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         Refresh.ifStale(this)
@@ -51,6 +52,7 @@ class LightTileService : TileService() {
         queue = Settings.queue(this)
         rings = Settings.tileRings(this)
         innerLabels = Settings.tileInnerLabels(this)
+        showNext = Settings.tileShowNext(this)
         val start = ZonedDateTime.now(Schedule.ZONE).truncatedTo(ChronoUnit.MINUTES)
         // Half-hour slot boundaries: within a slot only the countdown changes, and the watch computes it.
         val firstBoundary = start.truncatedTo(ChronoUnit.HOURS).plusMinutes(if (start.minute >= 30) 60 else 30)
@@ -186,6 +188,14 @@ class LightTileService : TileService() {
                         13f, GREY
                     )
                 )
+            // how long the next phase lasts, as in the app: "then 1h without power" / "then 3h with power"
+            st.nextLen?.takeIf { showNext }?.let {
+                val len = (if (st.nextEndIsMinimum) "≥ " else "") + Fmt.duration(this, it)
+                col.addContent(gap(1f))
+                    .addContent(
+                        text(getString(if (st.off) R.string.next_with_power else R.string.next_without_power, len), 12f, LABEL)
+                    )
+            }
         }
 
         if (fetched > 0) {
