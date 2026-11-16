@@ -263,6 +263,10 @@ object Notify {
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, intent: Intent) {
         Refresh.ensure(c)
+        // After an app update, a reboot or a clock/time zone change nobody asks for a new tile: the system keeps
+        // showing the one it cached (the old layout, or a timeline built for the wrong time) until its freshness
+        // runs out or the data changes, so ask for it, and for the complication, right away.
+        if (!intent.hasExtra("at")) Fetcher.notifyAll(c)
         if (intent.hasExtra("at")) {
             val at = Instant.ofEpochMilli(intent.getLongExtra("at", 0)).atZone(Schedule.ZONE)
             // the schedule may have changed since scheduling: notify only if the event still holds

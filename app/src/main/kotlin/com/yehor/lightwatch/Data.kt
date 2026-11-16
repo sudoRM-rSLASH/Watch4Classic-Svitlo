@@ -278,9 +278,12 @@ object Fetcher {
     }
 
     fun notifyAll(c: Context) {
-        requestTileUpdate(c)
-        LightComplicationService.requestUpdate(c)
-        Notify.schedule(c)
+        // A BroadcastReceiver's own context may not bind to services, which the tile and complication update
+        // requests do, so always go through the application context.
+        val app = c.applicationContext
+        requestTileUpdate(app)
+        LightComplicationService.requestUpdate(app)
+        Notify.schedule(app)
     }
 }
 
