@@ -182,8 +182,11 @@ object TileRing {
         val (line, gap) =
             if (ring.slots == 48) DASH_DEG to GAP_DEG
             else dashGeometry(TILE_RADIUS_DP - ring.dashInset - THICKNESS_DP / 2, ring.pitchDeg, ring.pitchDeg - 3.5f)
+        // The round caps stick out of the line by half the thickness at both ends, so a dash looks line + 2 caps
+        // long. Starting the arc half a gap after the slot's start centres the visible dash in its slot (starting
+        // at the slot's start would push it left by the cap and leave the whole gap at its end).
         val arc = Arc.Builder()
-            .setAnchorAngle(degrees(0f))
+            .setAnchorAngle(degrees(gap / 2))
             .setAnchorType(LayoutElementBuilders.ARC_ANCHOR_START)
         for (k in 0 until ring.slots) {
             val i = ring.firstSlot + k
